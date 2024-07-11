@@ -10,7 +10,7 @@ export default {
     description: "登入",
     run: async ({ page, params, shared, logger }) => {
         let success = false;
-        await page.setUserAgent("bahadroid (https://www.gamer.com.tw/)");
+#        await page.setUserAgent("bahadroid (https://www.gamer.com.tw/)");
         await page.goto("https://www.gamer.com.tw/");
         await wait_for_cloudflare(page);
 
