@@ -2,10 +2,11 @@ import { utils } from "bahamut-automation";
 import { authenticator } from "otplib";
 import { MAIN_FRAME, solve } from "recaptcha-solver";
 const { wait_for_cloudflare } = utils;
+
 var login_default = {
   name: "Login",
   description: "\u767B\u5165",
-  run: async ({ page, params, shared, logger }) => {
+  run: async ({ page, params, shared, logger, context }) => {
     let success = false;
     await context.setUserAgent("bahadroid (https://www.gamer.com.tw/)");
     await page.goto("https://www.gamer.com.tw/");
@@ -49,6 +50,7 @@ var login_default = {
     return { success };
   }
 };
+
 async function check_2fa(page, twofa, logger) {
   const enabled = await page.isVisible("#form-login #input-2sa");
   if (enabled) {
@@ -63,6 +65,7 @@ async function check_2fa(page, twofa, logger) {
     logger.log("\u6C92\u6709\u555F\u7528 2FA");
   }
 }
+
 export {
   login_default as default
 };
