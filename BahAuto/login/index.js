@@ -18,8 +18,8 @@ var login_default = {
         await page.waitForTimeout(1e3);
         let not_login_signal = await page.$("div.TOP-my.TOP-nologin");
         if (not_login_signal) {
-          await page.goto("https://user.gamer.com.tw/login.php");
-          logger.log("\u767B\u5165\u4E2D ...");
+          await page.goto("https://api.gamer.com.tw/mobile_app/user/v3/do_login.php");
+          logger.log("\u9a57\u8b49\u78bc\u932f\u8aa4 ...");
           const precheck = page.waitForResponse(
             (res) => res.url().includes("login_precheck.php")
           );
