@@ -74,6 +74,9 @@ export default {
           options.headers = {
             ...(options.headers || {}),
             'User-Agent': 'Bahadroid (https://www.gamer.com.tw/)',
+            //  --- 加入 Referer 頭 ---
+            'Referer': 'https://www.gamer.com.tw/',
+            //  --- 加入 Referer 頭 結束 ---
           };
           return originalFetch(url, options);
         };
