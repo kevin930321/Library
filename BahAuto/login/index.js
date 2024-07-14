@@ -5,61 +5,63 @@ const { wait_for_cloudflare } = utils;
 
 var login_default = {
   name: "Login",
-  description: "\u767B\u5165",
-  run: async ({ page, params, shared, logger }) => {
+  description: "登入",
+  run: async ({ params, shared, logger }) => {
     let success = false;
-    const apiUrl = 'https://api.gamer.com.tw/mobile_app/user/v3/do_login.php';
-    const vcode = '7045'; // 這是範例驗證碼，需要根據實際情況更新
-    
-    await page.goto("https://www.gamer.com.tw/");
-    await wait_for_cloudflare(page);
-    
     const max_attempts = +params.max_attempts || +shared.max_attempts || 3;
     for (let i = 0; i < max_attempts; i++) {
       try {
-        logger.log("\u6B63\u5728\u6AA2\u6E2C\u767B\u5165\u72C0\u614B");
+        logger.log("正在檢測登入狀態");
+        const response = await UrlFetchApp.fetch("https://www.gamer.com.tw/");
+        await wait_for_cloudflare(response); // 這邊需要修改 wait_for_cloudflare 函式來處理 UrlFetchApp.fetch 的結果
+        if (response.getResponseCode() === 200) { 
+          // 檢查是否已登入，例如檢查回應內容是否包含特定元素
+          if (/* 檢查是否已登入 */) {
+            logger.log("登入狀態: 已登入");
+            success = true;
+            break;
+          } else {
+            logger.log("尚未登入，正在嘗試登入...");
+            const loginResponse = await UrlFetchApp.fetch('https://api.gamer.com.tw/mobile_app/user/v3/do_login.php', {
+              'method': 'POST',
+              'payload': {
+                'uid': params.username,
+                'passwd': params.password,
+                'vcode': '7045' // 這邊需要想辦法取得最新的驗證碼
+              },
+              'headers': {
+                'User-Agent': 'Bahadroid (https://www.gamer.com.tw/)',
+                'Cookie': 'ckAPP_VCODE=7045' // 這邊也需要想辦法取得最新的驗證碼
+              }
+            });
 
-        // 發送 POST 請求進行登入
-        const response = await page.evaluate(async (apiUrl, username, password, vcode) => {
-          const response = await fetch(apiUrl, {
-            method: 'POST',
-            headers: {
-              'User-Agent': 'Bahadroid (https://www.gamer.com.tw/)',
-              'Content-Type': 'application/x-www-form-urlencoded',
-              'Cookie': `ckAPP_VCODE=${vcode}`
-            },
-            body: new URLSearchParams({
-              uid: username,
-              passwd: password,
-              vcode: vcode
-            })
-          });
-
-          const setCookie = response.headers.get('set-cookie');
-          if (setCookie) {
-            const match = /BAHARUNE=([^;]+)/.exec(setCookie);
-            return match ? match[1] : null;
+            if (loginResponse.getResponseCode() === 200) {
+              const baharuneCookie = loginResponse.getAllHeaders()['Set-Cookie'].find(cookie => /BAHARUNE/.test(cookie));
+              if (baharuneCookie) {
+                const baharuneValue = baharuneCookie.match(/(?<=BAHARUNE=)[^;]*(?=;)/)[0]; 
+                logger.log("登入成功！BAHARUNE: " + baharuneValue);
+                success = true;
+                break;
+              } else {
+                logger.log("登入失敗，找不到 BAHARUNE Cookie");
+              }
+            } else {
+              logger.log("登入請求失敗: " + loginResponse.getResponseCode());
+            }
           }
-          return null;
-        }, apiUrl, params.username, params.password, vcode);
-
-        if (response) {
-          logger.log("\u767B\u5165\u6210\u529F");
-          success = true;
-          shared.flags.logged = true;
-          break;
         } else {
-          logger.log("\u767B\u5165\u5931\u6557\uFF0C\u91CD\u65B0\u5617\u8A66\u4E2D");
+          logger.log("無法訪問網站: " + response.getResponseCode());
         }
       } catch (err) {
-        logger.error("\u767B\u5165\u6642\u767C\u751F\u932F\u8AA4\uFF0C\u91CD\u65B0\u5617\u8A66\u4E2D", err);
+        logger.error("登入時發生錯誤，重新嘗試中", err);
       }
     }
 
+    if (success) {
+      shared.flags.logged = true;
+    }
     return { success };
   }
 };
 
-export {
-  login_default as default
-};
+export default login_default;
