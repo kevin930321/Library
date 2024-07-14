@@ -7,7 +7,6 @@ var login_default = {
   name: "Login",
   description: "\u767B\u5165",
   run: async ({ page, params, shared, logger }) => {
-    await page.setUserAgent(params.userAgent || "Bahadroid (https://www.gamer.com.tw/)"); 
     let success = false;
     await page.goto("https://www.gamer.com.tw/");
     await wait_for_cloudflare(page);
