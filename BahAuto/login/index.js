@@ -7,7 +7,7 @@ const { wait_for_cloudflare } = utils;
 export default {
   name: "Login",
   description: "登入",
-  run: async ({ page, params, shared, logger, browserContext }) => { // 注意這裡增加了 browserContext
+  run: async ({ page, params, shared, logger, browserContext }) => { 
     let success = false;
 
     // 設定 User-Agent
