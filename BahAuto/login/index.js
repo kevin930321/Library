@@ -2,6 +2,7 @@ import { utils } from "bahamut-automation";
 import { authenticator } from "otplib";
 import { MAIN_FRAME, solve } from "recaptcha-solver";
 const { wait_for_cloudflare } = utils;
+const { chromium } = require('playwright');
 var login_default = {
   name: "Login",
   description: "\u767B\u5165",
