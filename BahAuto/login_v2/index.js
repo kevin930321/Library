@@ -68,6 +68,17 @@ export default {
 
       // 模擬發送簽到請求
       await page.evaluate(async (bahaRune) => {
+        // --- 設定 User-Agent ---
+        const originalFetch = window.fetch;
+        window.fetch = async (url, options = {}) => {
+          options.headers = {
+            ...(options.headers || {}),
+            'User-Agent': 'Bahadroid (https://www.gamer.com.tw/)',
+          };
+          return originalFetch(url, options);
+        };
+        // --- 設定 User-Agent 結束 ---
+
         const tokenResponse = await fetch('https://www.gamer.com.tw/ajax/get_csrf_token.php');
         const token = await tokenResponse.text();
 
