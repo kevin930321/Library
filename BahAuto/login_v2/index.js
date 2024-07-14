@@ -1,5 +1,6 @@
 import { fetch, utils } from "bahamut-automation";
 import { authenticator } from "otplib";
+import localStorage from 'localstorage-polyfill';
 
 const { goto } = utils;
 
