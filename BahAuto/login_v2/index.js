@@ -71,8 +71,18 @@ export default {
       );
       await page.reload();
       await page.waitForTimeout(1000);
-      logger.success("✅ 登入 Cookie 已載入");
-      result.success = true;
+
+      // 新增：檢查登入狀態
+      const loggedIn = await page.evaluate(() => {
+        return document.cookie.includes('BAHARUNE') && document.cookie.includes('BAHAENUR');
+      });
+      if (loggedIn) {
+        logger.success("✅ 登入 Cookie 已載入且檢查成功");
+        result.success = true;
+      } else {
+        logger.error("❌ Cookie 檢查失敗");
+        result.success = false;
+      }
     } else {
       result.success = false;
     }
