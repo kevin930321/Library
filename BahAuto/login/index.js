@@ -1,4 +1,4 @@
-import { Logger, Module, utils } from "bahamut-automation";
+import { Logger, utils } from "bahamut-automation";
 import { authenticator } from "otplib";
 import { Page } from "playwright-core";
 import { MAIN_FRAME, solve } from "recaptcha-solver";
