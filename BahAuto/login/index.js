@@ -13,15 +13,19 @@ export default {
     // 嘗試登入 API 端點
     try {
       logger.log("正在嘗試登入 API");
+      await page.goto("https://www.gamer.com.tw/");
+      
+      // 使用 page.evaluate 设置 User-Agent
+      await page.evaluate(() => {
+          navigator.userAgent = 'Bahadroid (https://www.gamer.com.tw/)';
+      });
+
       const response = await page.request.post("https://api.gamer.com.tw/mobile_app/user/v3/do_login.php", {
         data: {
           username: params.username,
           password: params.password,
           // 其他必要的 API 參數
         },
-        headers: {
-          'User-Agent': 'Bahadroid (https://www.gamer.com.tw/)' // 在這裡設定 User-Agent
-        }
       });
 
       // 檢查登入結果
