@@ -1,74 +1,77 @@
-import { utils } from "bahamut-automation";
+import { Logger, Module, utils } from "bahamut-automation";
 import { authenticator } from "otplib";
+import { Page } from "playwright-core";
+import { MAIN_FRAME, solve } from "recaptcha-solver";
 
 const { wait_for_cloudflare } = utils;
 
-var login_default = {
-  name: "Login",
-  description: "登入",
-  run: async ({ page, params, shared, logger }) => {
-    let success = false;
-    await page.goto("https://www.gamer.com.tw/"); // 可以考慮移除這行，因為我們要模擬 App 行為
-    await wait_for_cloudflare(page); // 可以考慮移除這行
-    const max_attempts = +params.max_attempts || +shared.max_attempts || 3;
+export default {
+    name: "Login",
+    description: "登入",
+    run: async ({ page, params, shared, logger }) => {
+        let success = false;
+        await page.goto("https://www.gamer.com.tw/");
+        await wait_for_cloudflare(page);
 
-    for (let i = 0; i < max_attempts; i++) {
-      try {
-        logger.log("正在嘗試登入");
-        const response = await page.evaluate(
-          async ({ username, password }) => {
-            return await fetch(
-              "https://api.gamer.com.tw/mobile_app/user/v3/do_login.php",
-              {
-                method: "POST",
-                headers: {
-                  "User-Agent": "Bahadroid (https://www.gamer.com.tw/)",
-                  Cookie: "ckAPP_VCODE=7045", // 注意，這裡的驗證碼需要動態取得
-                },
-                body: JSON.stringify({
-                  uid: username,
-                  passwd: password,
-                  vcode: "7045", // 注意，這裡的驗證碼需要動態取得
-                }),
-              }
-            );
-          },
-          { username: params.username, password: params.password }
-        );
+        const max_attempts = +params.max_attempts || +shared.max_attempts || 3;
+        for (let i = 0; i < max_attempts; i++) {
+            try {
+                logger.log("正在檢測登入狀態");
+                await page.goto("https://www.gamer.com.tw/");
+                await page.waitForTimeout(1000);
 
-        const cookies = await response.headers().get("set-cookie");
-        const baharuneCookie = cookies
-          .split(";")
-          .find((cookie) => cookie.trim().startsWith("BAHARUNE="));
-        const baharuneValue = baharuneCookie
-          ? baharuneCookie.split("=")[1]
-          : null;
+                let not_login_signal = await page.$("div.TOP-my.TOP-nologin");
+                if (not_login_signal) {
+                    await page.goto("https://user.gamer.com.tw/login.php");
+                    logger.log("登入中 ...");
 
-        if (baharuneValue) {
-          logger.log("登入成功");
-          await page.setCookie({
-            name: "BAHARUNE",
-            value: baharuneValue,
-            domain: ".gamer.com.tw", // 設定 Cookie 的 domain
-            path: "/", // 設定 Cookie 的 path
-          });
-          success = true;
-          break;
-        } else {
-          logger.log("登入失敗: 無法取得 BAHARUNE Cookie");
-          // 這裡可以加入處理兩步驟驗證的邏輯
+                    const precheck = page.waitForResponse((res) =>
+                        res.url().includes("login_precheck.php"),
+                    );
+                    const uid_locator = page.locator("#form-login input[name=userid]");
+                    const pw_locator = page.locator("#form-login input[type=password]");
+
+                    await uid_locator.fill(params.username);
+                    await pw_locator.fill(params.password);
+
+                    await precheck;
+
+                    await check_2fa(page, params.twofa, logger);
+                    if (await page.isVisible(MAIN_FRAME)) {
+                        await solve(page).catch((err) => logger.info(err.message));
+                    }
+                    await page.click("#form-login #btn-login");
+                    await page.waitForNavigation({ timeout: 3000 });
+                } else {
+                    logger.log("登入狀態: 已登入");
+                    success = true;
+                    break;
+                }
+            } catch (err) {
+                logger.error("登入時發生錯誤，重新嘗試中", err);
+            }
         }
-      } catch (err) {
-        logger.error("登入時發生錯誤，重新嘗試中", err);
-      }
-    }
 
-    if (success) {
-      shared.flags.logged = true;
-    }
+        if (success) {
+            shared.flags.logged = true;
+        }
 
-    return { success };
-  },
+        return { success };
+    },
 };
 
-export default login_default;
+async function check_2fa(page, twofa, logger) {
+    const enabled = await page.isVisible("#form-login #input-2sa");
+
+    if (enabled) {
+        logger.log("有啟用 2FA");
+        if (!twofa) {
+            throw new Error("未提供 2FA 種子碼");
+        }
+        const code = authenticator.generate(twofa);
+        await page.fill("#form-login #input-2sa", code);
+        await page.evaluate(() => document.forms[0].submit());
+    } else {
+        logger.log("沒有啟用 2FA");
+    }
+}
