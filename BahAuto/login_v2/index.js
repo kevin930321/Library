@@ -1,8 +1,10 @@
 import { fetch, utils } from "bahamut-automation";
 import { authenticator } from "otplib";
-import { localStorage } from 'localstorage-polyfill'; // 引入 localstorage-polyfill
 
 const { goto } = utils;
+
+// 使用 Map 存储 Cookie
+const cookies = new Map();
 
 export default {
   name: "Login",
@@ -23,17 +25,11 @@ export default {
         query.append("twoStepAuth", authenticator.generate(params.twofa));
       }
       try {
-        // 初始化 localstorage-polyfill
-        localStorage.config({
-          deserializer: (value) => JSON.parse(value),
-          serializer: (value) => JSON.stringify(value)
-        });
+        // 从 cookies 中载入 Cookie
+        const storedBahaRune = cookies.get("BAHARUNE");
+        const storedBahaEnur = cookies.get("BAHAENUR");
 
-        // 從 localStorage 載入 Cookie
-        const storedBahaRune = localStorage.getItem("BAHARUNE");
-        const storedBahaEnur = localStorage.getItem("BAHAENUR");
-
-        // 使用 Cookie 發送請求
+        // 使用 Cookie 发送请求
         const res = await fetch(
           "https://api.gamer.com.tw/mobile_app/user/v3/do_login.php",
           {
@@ -49,9 +45,9 @@ export default {
         const body = await res.json();
 
         if (body.userid) {
-          const cookies = res.headers.get("set-cookie");
-          bahaRune = cookies.split(/(BAHARUNE=\w+)/)[1].split("=")[1];
-          bahaEnur = cookies.split(/(BAHAENUR=\w+)/)[1].split("=")[1];
+          const cookiesString = res.headers.get("set-cookie");
+          bahaRune = cookiesString.split(/(BAHARUNE=\w+)/)[1].split("=")[1];
+          bahaEnur = cookiesString.split(/(BAHAENUR=\w+)/)[1].split("=")[1];
           logger.success("✅ 登入成功");
           break;
         } else {
@@ -66,10 +62,10 @@ export default {
     }
 
     if (bahaRune && bahaEnur) {
-      // 儲存 Cookie 到 localStorage
-      localStorage.setItem("BAHAID", params.username);
-      localStorage.setItem("BAHARUNE", bahaRune);
-      localStorage.setItem("BAHAENUR", bahaEnur);
+      // 存储 Cookie 到 cookies 中
+      cookies.set("BAHAID", params.username);
+      cookies.set("BAHARUNE", bahaRune);
+      cookies.set("BAHAENUR", bahaEnur);
 
       await goto(page, "home");
       const context = page.context();
