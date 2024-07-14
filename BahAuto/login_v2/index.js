@@ -20,7 +20,8 @@ export default {
       const query = new URLSearchParams();
       query.append("uid", params.username);
       query.append("passwd", params.password);
-      query.append("vcode", "7045");
+      // 移除 vcode 
+      // query.append("vcode", params.vcode);
       if (params.twofa?.length) {
         query.append("twoStepAuth", authenticator.generate(params.twofa));
       }
@@ -44,6 +45,7 @@ export default {
         );
         const body = await res.json();
 
+        // 检查登入结果
         if (body.userid) {
           const cookiesString = res.headers.get("set-cookie");
           bahaRune = cookiesString.split(/(BAHARUNE=\w+)/)[1].split("=")[1];
@@ -51,6 +53,12 @@ export default {
           logger.success("✅ 登入成功");
           break;
         } else {
+          // 处理登入失败的情况
+          if (body.message === "驗證碼錯誤") {
+            logger.error("❌ 驗證碼錯誤，請重新輸入！");
+          } else {
+            logger.error("❌ 登入失敗: ", body.message);
+          }
           result = body.message;
         }
       } catch (err) {
@@ -89,6 +97,7 @@ export default {
       shared.flags.logged = true;
     }
 
+    // 返回登入结果
     return result;
   }
 };
