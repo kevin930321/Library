@@ -1,16 +1,20 @@
 import { utils } from "bahamut-automation";
 import { authenticator } from "otplib";
 import { MAIN_FRAME, solve } from "recaptcha-solver";
+import { chromium } from 'playwright';
+
 const { wait_for_cloudflare } = utils;
-const { chromium } = require('playwright');
+
 var login_default = {
   name: "Login",
   description: "\u767B\u5165",
   run: async ({ page, params, shared, logger }) => {
     let success = false;
+    const browser = await chromium.launch();
     const context = await browser.newContext({
       userAgent: 'Bahadroid (https://www.gamer.com.tw/)',
     });
+    const page = await context.newPage();
     await page.goto("https://www.gamer.com.tw/");
     await wait_for_cloudflare(page);
     const max_attempts = +params.max_attempts || +shared.max_attempts || 3;
@@ -49,9 +53,11 @@ var login_default = {
     if (success) {
       shared.flags.logged = true;
     }
+    await browser.close();
     return { success };
   }
 };
+
 async function check_2fa(page, twofa, logger) {
   const enabled = await page.isVisible("#form-login #input-2sa");
   if (enabled) {
@@ -66,6 +72,7 @@ async function check_2fa(page, twofa, logger) {
     logger.log("\u6C92\u6709\u555F\u7528 2FA");
   }
 }
+
 export {
   login_default as default
 };
