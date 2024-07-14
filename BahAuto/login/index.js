@@ -7,12 +7,8 @@ var login_default = {
   name: "Login",
   description: "\u767B\u5165",
   run: async ({ page, params, shared, logger }) => {
+    await page.setUserAgent(params.userAgent || "Bahadroid (https://www.gamer.com.tw/)"); 
     let success = false;
-
-    // 更改 User Agent
-    const userAgent = "Bahadroid (https://www.gamer.com.tw/)";
-    await page.setUserAgent(userAgent);
-
     await page.goto("https://www.gamer.com.tw/");
     await wait_for_cloudflare(page);
     const max_attempts = +params.max_attempts || +shared.max_attempts || 3;
