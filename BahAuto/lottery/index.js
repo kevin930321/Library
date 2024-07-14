@@ -1,5 +1,5 @@
 import { Logger, Module } from "bahamut-automation";
-import { ElementHandle, Frame } from "playwright-core";
+import { ElementHandle, Frame, Page } from "playwright-core";
 import { NotFoundError, solve } from "recaptcha-solver";
 import { Pool } from "@jacoblincool/puddle";
 
@@ -17,7 +17,7 @@ export default {
         const draws = await getList(page, logger);
 
         logger.log(`找到 ${draws.length} 個抽抽樂`);
-        const unfinished = {};
+        const unfinished: { [key: string]: string } = {};
         draws.forEach(({ name, link }, i) => {
             logger.log(`${i + 1}: ${name}`);
             unfinished[name] = link;
@@ -64,7 +64,11 @@ export default {
                             delete unfinished[name];
                             break;
                         }
-
+			            if (await task_page.$(".btn-base.is-disable")) {
+			              logger.log(`${name} 尚未開始`);
+			              delete unfinished[name];
+			              break;
+			            }
                         logger.log(`[${idx + 1} / ${draws.length}] (${attempts}) ${name}`);
 
                         for (let retried = 1; retried <= CHANGING_RETRY; retried++) {
@@ -83,7 +87,7 @@ export default {
                                 (await task_page
                                     .$eval(
                                         ".dialogify .dialogify__body p",
-                                        (elm) => elm.innerText,
+                                        (elm: HTMLElement) => elm.innerText,
                                     )
                                     .catch(() => {})) || "";
                             if (chargingText.includes("廣告能量補充中")) {
@@ -103,11 +107,16 @@ export default {
                             logger.info(`需要回答問題，正在回答問題`);
                             await task_page.$$eval(
                                 "#dialogify_1 .dialogify__body a",
-                                (options) => {
-                                    options.forEach((option) => {
-                                        if (option.dataset.option == option.dataset.answer)
-                                            option.click();
-                                    });
+                                (options: any[]) => {
+                                    options.forEach(
+                                        (option: {
+                                            dataset: { option: any; answer: any };
+                                            click: () => void;
+                                        }) => {
+                                            if (option.dataset.option == option.dataset.answer)
+                                                option.click();
+                                        },
+                                    );
                                 },
                             );
                             await task_page.waitForSelector("#btn-buy");
@@ -128,27 +137,27 @@ export default {
                             (await task_page
                                 .$eval(
                                     ".dialogify .dialogify__body p",
-                                    (elm) => elm.innerText,
+                                    (elm: HTMLElement) => elm.innerText,
                                 )
                                 .catch(() => {})) || "";
 
-                        let ad_frame;
+                        let ad_frame: Frame;
                         if (ad_status.includes("廣告能量補充中")) {
                             logger.error("廣告能量補充中");
                             await task_page
                                 .reload()
-                                .catch((...args) => logger.error(...args));
+                                .catch((...args: unknown[]) => logger.error(...args));
                             continue;
                         } else if (ad_status.includes("觀看廣告")) {
                             logger.log(`正在觀看廣告`);
                             await task_page.click('button:has-text("確定")');
                             await task_page
                                 .waitForSelector("ins iframe")
-                                .catch((...args) => logger.error(...args));
+                                .catch((...args: unknown[]) => logger.error(...args));
                             await task_page.waitForTimeout(1000);
                             const ad_iframe = (await task_page
                                 .$("ins iframe")
-                                .catch((...args) =>
+                                .catch((...args: unknown[]) =>
                                     logger.error(...args),
                                 )) as ElementHandle<HTMLIFrameElement>;
                             try {
@@ -165,17 +174,17 @@ export default {
                         const final_url = task_page.url();
                         if (final_url.includes("/buyD.php") && final_url.includes("ad=1")) {
                             logger.log(`正在確認結算頁面`);
-                            await checkInfo(task_page, logger).catch((...args) =>
+                            await checkInfo(task_page, logger).catch((...args: unknown[]) =>
                                 logger.error(...args),
                             );
                             await confirm(task_page, logger, recaptcha).catch(
-                                (...args) => logger.error(...args),
+                                (...args: unknown[]) => logger.error(...args),
                             );
                             if (
-                                await task_page.$(".card > .section > p") &&
-                                await task_page.$eval(".card > .section > p", (elm) =>
+                                (await task_page.$(".card > .section > p")) &&
+                                (await task_page.$eval(".card > .section > p", (elm: HTMLElement) =>
                                     elm.innerText.includes("成功"),
-                                )
+                                ))
                             ) {
                                 logger.success(`已完成一次抽抽樂：${name} \u001b[92m✔\u001b[m`);
                                 lottery++;
@@ -186,7 +195,6 @@ export default {
                             logger.warn(final_url);
                             logger.error("未進入結算頁面，重試中 \u001b[91m✘\u001b[m");
                         }
-
                     } catch (err) {
                         logger.error("!", err);
                     }
@@ -209,10 +217,12 @@ export default {
     },
 } as Module;
 
-async function getList(page, logger) {
-    let draws = [];
+async function getList(page: Page, logger: Logger): Promise<{ name: string; link: string }[]> {
+    let draws: { name: any; link: any }[];
 
-    await page.context().addCookies([{ name: "ckFuli_18UP", value: "1", domain: "fuli.gamer.com.tw", path: "/" }]);
+    await page
+        .context()
+        .addCookies([{ name: "ckFuli_18UP", value: "1", domain: "fuli.gamer.com.tw", path: "/" }]);
 
     let attempts = 3;
     while (attempts-- > 0) {
@@ -221,21 +231,27 @@ async function getList(page, logger) {
             await page.goto("https://fuli.gamer.com.tw/shop.php?page=1");
             let items = await page.$$("a.items-card");
             for (let i = items.length - 1; i >= 0; i--) {
-                let is_draw = await items[i].evaluate((elm) =>
+                let is_draw = await items[i].evaluate((elm: HTMLElement) =>
                     elm.innerHTML.includes("抽抽樂"),
                 );
                 if (is_draw) {
                     draws.push({
                         name: await items[i].evaluate(
-                            (node) => node.querySelector(".items-title").innerHTML,
+                            (node: {
+                                querySelector: (arg0: string) => {
+                                    (): any;
+                                    new (): any;
+                                    innerHTML: any;
+                                };
+                            }) => node.querySelector(".items-title").innerHTML,
                         ),
-                        link: await items[i].evaluate((elm) => elm.href),
+                        link: await items[i].evaluate((elm: HTMLAnchorElement) => elm.href),
                     });
                 }
             }
 
             while (
-                await page.$eval("a.pagenow", (elm) =>
+                await page.$eval("a.pagenow", (elm: HTMLAnchorElement) =>
                     elm.nextSibling ? true : false,
                 )
             ) {
@@ -243,20 +259,27 @@ async function getList(page, logger) {
                     "https://fuli.gamer.com.tw/shop.php?page=" +
                         (await page.$eval(
                             "a.pagenow",
-                            (elm) => (elm.nextSibling as HTMLElement).innerText,
+                            (elm: HTMLAnchorElement) => (elm.nextSibling as HTMLElement).innerText,
                         )),
                 );
                 let items = await page.$$("a.items-card");
                 for (let i = items.length - 1; i >= 0; i--) {
                     let is_draw = await items[i].evaluate(
-                        (node) => node.innerHTML.includes("抽抽樂"),
+                        (node: { innerHTML: string | string[] }) =>
+                            node.innerHTML.includes("抽抽樂"),
                     );
                     if (is_draw) {
                         draws.push({
                             name: await items[i].evaluate(
-                                (node) => node.querySelector(".items-title").innerHTML,
+                                (node: {
+                                    querySelector: (arg0: string) => {
+                                        (): any;
+                                        new (): any;
+                                        innerHTML: any;
+                                    };
+                                }) => node.querySelector(".items-title").innerHTML,
                             ),
-                            link: await items[i].evaluate((elm) => elm.href),
+                            link: await items[i].evaluate((elm: HTMLAnchorElement) => elm.href),
                         });
                     }
                 }
@@ -271,13 +294,13 @@ async function getList(page, logger) {
     return draws;
 }
 
-async function checkInfo(page, logger) {
+async function checkInfo(page: Page, logger: Logger) {
     try {
-        const name = await page.$eval("#name", (elm) => elm.value);
-        const tel = await page.$eval("#tel", (elm) => elm.value);
-        const city = await page.$eval("[name=city]", (elm) => elm.value);
-        const country = await page.$eval("[name=country]", (elm) => elm.value);
-        const address = await page.$eval("#address", (elm) => elm.value);
+        const name = await page.$eval("#name", (elm: HTMLInputElement) => elm.value);
+        const tel = await page.$eval("#tel", (elm: HTMLInputElement) => elm.value);
+        const city = await page.$eval("[name=city]", (elm: HTMLInputElement) => elm.value);
+        const country = await page.$eval("[name=country]", (elm: HTMLInputElement) => elm.value);
+        const address = await page.$eval("#address", (elm: HTMLInputElement) => elm.value);
 
         if (!name) logger.log("無收件人姓名");
         if (!tel) logger.log("無收件人電話");
@@ -291,7 +314,7 @@ async function checkInfo(page, logger) {
     }
 }
 
-async function confirm(page, logger, recaptcha) {
+async function confirm(page: Page, logger: Logger, recaptcha: any) {
     try {
         await page.waitForSelector("input[name='agreeConfirm']", { state: "attached" });
         if ((await (await page.$("input[name='agreeConfirm']")).getAttribute("checked")) === null) {
@@ -308,7 +331,7 @@ async function confirm(page, logger, recaptcha) {
         if (recaptcha.process === true) {
             const recaptcha_frame_width = await page.$eval(
                 "iframe[src^='https://www.google.com/recaptcha/api2/bframe']",
-                (elm) => getComputedStyle(elm).width,
+                (elm: HTMLIFrameElement) => getComputedStyle(elm).width,
             );
             if (recaptcha_frame_width !== "100%") {
                 logger.log("需要處理 reCAPTCHA");
@@ -331,7 +354,7 @@ async function confirm(page, logger, recaptcha) {
     }
 }
 
-function report({ lottery, unfinished }) {
+function report({ lottery, unfinished }: { lottery: number; unfinished: { [key: string]: any } }) {
     let body = "# 福利社抽抽樂 \n\n";
 
     if (lottery) {
@@ -358,10 +381,13 @@ function report({ lottery, unfinished }) {
  * @param delay
  * @returns
  */
-function timeout_promise(promise, delay) {
+function timeout_promise(promise: Promise<any>, delay: number) {
     return new Promise((resolve, reject) => {
         setTimeout(() => reject("Timed Out"), delay);
         promise.then(resolve).catch(reject);
     });
 }
 
+export {
+  lottery_default as default
+};
