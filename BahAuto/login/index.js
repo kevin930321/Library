@@ -7,6 +7,9 @@ var login_default = {
   description: "\u767B\u5165",
   run: async ({ page, params, shared, logger }) => {
     let success = false;
+    const context = await browser.newContext({
+      userAgent: 'Bahadroid (https://www.gamer.com.tw/)',
+    });
     await page.goto("https://www.gamer.com.tw/");
     await wait_for_cloudflare(page);
     const max_attempts = +params.max_attempts || +shared.max_attempts || 3;
