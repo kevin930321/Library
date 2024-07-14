@@ -36,9 +36,15 @@ export default {
         const body = await res.json();
 
         if (body.userid) {
-          const cookies = res.headers.get("set-cookie");
-          bahaRune = cookies.split(/(BAHARUNE=\w+)/)[1].split("=")[1];
-          bahaEnur = cookies.split(/(BAHAENUR=\w+)/)[1].split("=")[1];
+          const cookies = res.headers.raw()["set-cookie"];
+          for (const cookie of cookies) {
+            if (cookie.includes("BAHARUNE")) {
+              bahaRune = cookie.match(/BAHARUNE=(\w+)/)[1];
+            }
+            if (cookie.includes("BAHAENUR")) {
+              bahaEnur = cookie.match(/BAHAENUR=(\w+)/)[1];
+            }
+          }
           logger.success("✅ 登入成功");
           break;
         } else {
@@ -57,13 +63,13 @@ export default {
       const context = page.context();
       await context.addInitScript(
         ([BAHAID, BAHARUNE, BAHAENUR]) => {
-          document.cookie = `BAHAID=${BAHAID}; path=/; domain=gamer.com.tw`;
-          document.cookie = `BAHARUNE=${BAHARUNE}; path=/; domain=gamer.com.tw`;
-          document.cookie = `BAHAENUR=${BAHAENUR}; path=/; domain=gamer.com.tw`;
+          document.cookie = `BAHAID=${BAHAID}; path=/; domain=.gamer.com.tw`;
+          document.cookie = `BAHARUNE=${BAHARUNE}; path=/; domain=.gamer.com.tw`;
+          document.cookie = `BAHAENUR=${BAHAENUR}; path=/; domain=.gamer.com.tw`;
         },
         [params.username, bahaRune, bahaEnur]
       );
-      await goto(page, "home");
+      await page.reload();
       await page.waitForTimeout(1000);
       logger.success("✅ 登入 Cookie 已載入");
       result.success = true;
