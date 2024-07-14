@@ -1,7 +1,7 @@
-import { Logger, Module } from "bahamut-automation";
-import { ElementHandle, Frame, Page } from "playwright-core";
-import { NotFoundError, solve } from "recaptcha-solver";
-import { Pool } from "@jacoblincool/puddle";
+import { solve, NotFoundError } from 'recaptcha-solver';
+import { Pool } from '@jacoblincool/puddle';
+import { ElementHandle, Frame, Page } from 'playwright-core';
+import { Logger, Module } from 'bahamut-automation';
 
 export default {
     name: "福利社",
@@ -42,13 +42,11 @@ export default {
                     if (response.url().includes("recaptcha/api2/userverify")) {
                         const text = (await response.text()).replace(")]}'\n", "");
                         const data = JSON.parse(text);
-                        // data[2]: 0 = failed reCAPTCHA, 1 = passed reCAPTCHA
                         recaptcha.process = data[2] === 0;
                     }
                     if (response.url().includes("recaptcha/api2/reload")) {
                         const text = (await response.text()).replace(")]}'\n", "");
                         const data = JSON.parse(text);
-                        // data[5]: Only equals to "nocaptcha" means passed reCAPTCHA
                         recaptcha.process = data[5] !== "nocaptcha";
                     }
                 });
@@ -69,23 +67,15 @@ export default {
 
                         for (let retried = 1; retried <= CHANGING_RETRY; retried++) {
                             await Promise.all([
-                                task_page
-                                    .waitForResponse(/ajax\/check_ad.php/, { timeout: 5000 })
-                                    .catch(() => {}),
+                                task_page.waitForResponse(/ajax\/check_ad.php/, { timeout: 5000 }).catch(() => {}),
                                 task_page.click("text=看廣告免費兌換").catch(() => {}),
-                                task_page
-                                    .waitForSelector(".fuli-ad__qrcode", {
-                                        timeout: 5000,
-                                    })
-                                    .catch(() => {}),
+                                task_page.waitForSelector(".fuli-ad__qrcode", { timeout: 5000 }).catch(() => {}),
                             ]);
-                            const chargingText =
-                                (await task_page
-                                    .$eval(
-                                        ".dialogify .dialogify__body p",
-                                        (elm: HTMLElement) => elm.innerText,
-                                    )
-                                    .catch(() => {})) || "";
+
+                            const chargingText = await task_page
+                                .$eval(".dialogify .dialogify__body p", (elm) => elm.innerText)
+                                .catch(() => "");
+
                             if (chargingText.includes("廣告能量補充中")) {
                                 logger.info(`廣告能量補充中，重試 (${retried}/${CHANGING_RETRY})`);
                                 await task_page.click("button:has-text('關閉')");
@@ -93,69 +83,41 @@ export default {
                             }
                             break;
                         }
-                        if (
-                            await task_page
-                                .$eval(".dialogify", (elm) =>
-                                    elm.textContent.includes("勇者問答考驗"),
-                                )
-                                .catch(() => {})
-                        ) {
+
+                        if (await task_page.$eval(".dialogify", (elm) => elm.textContent.includes("勇者問答考驗"))) {
                             logger.info(`需要回答問題，正在回答問題`);
-                            await task_page.$$eval(
-                                "#dialogify_1 .dialogify__body a",
-                                (options: any[]) => {
-                                    options.forEach(
-                                        (option: {
-                                            dataset: { option: any; answer: any };
-                                            click: () => void;
-                                        }) => {
-                                            if (option.dataset.option == option.dataset.answer)
-                                                option.click();
-                                        },
-                                    );
-                                },
-                            );
+                            await task_page.$$eval("#dialogify_1 .dialogify__body a", (options) => {
+                                options.forEach((option) => {
+                                    if (option.dataset.option == option.dataset.answer)
+                                        option.click();
+                                });
+                            });
                             await task_page.waitForSelector("#btn-buy");
                             await task_page.waitForTimeout(100);
                             await task_page.click("#btn-buy");
                         }
 
                         await Promise.all([
-                            task_page
-                                .waitForSelector(".dialogify .dialogify__body p", { timeout: 5000 })
-                                .catch(() => {}),
-                            task_page
-                                .waitForSelector("button:has-text('確定')", { timeout: 5000 })
-                                .catch(() => {}),
+                            task_page.waitForSelector(".dialogify .dialogify__body p", { timeout: 5000 }).catch(() => {}),
+                            task_page.waitForSelector("button:has-text('確定')", { timeout: 5000 }).catch(() => {}),
                         ]);
 
-                        const ad_status =
-                            (await task_page
-                                .$eval(
-                                    ".dialogify .dialogify__body p",
-                                    (elm: HTMLElement) => elm.innerText,
-                                )
-                                .catch(() => {})) || "";
+                        const ad_status = await task_page
+                            .$eval(".dialogify .dialogify__body p", (elm) => elm.innerText)
+                            .catch(() => "");
 
-                        let ad_frame: Frame;
+                        let ad_frame;
                         if (ad_status.includes("廣告能量補充中")) {
                             logger.error("廣告能量補充中");
-                            await task_page
-                                .reload()
-                                .catch((...args: unknown[]) => logger.error(...args));
+                            await task_page.reload().catch((err) => logger.error(err));
                             continue;
                         } else if (ad_status.includes("觀看廣告")) {
                             logger.log(`正在觀看廣告`);
                             await task_page.click('button:has-text("確定")');
-                            await task_page
-                                .waitForSelector("ins iframe")
-                                .catch((...args: unknown[]) => logger.error(...args));
+                            await task_page.waitForSelector("ins iframe").catch((err) => logger.error(err));
                             await task_page.waitForTimeout(1000);
-                            const ad_iframe = (await task_page
-                                .$("ins iframe")
-                                .catch((...args: unknown[]) =>
-                                    logger.error(...args),
-                                )) as ElementHandle<HTMLIFrameElement>;
+
+                            const ad_iframe = await task_page.$("ins iframe").catch((err) => logger.error(err)) as ElementHandle<HTMLIFrameElement>;
                             try {
                                 ad_frame = await ad_iframe.contentFrame();
                                 await shared.ad_handler({ ad_frame });
@@ -170,18 +132,11 @@ export default {
                         const final_url = task_page.url();
                         if (final_url.includes("/buyD.php") && final_url.includes("ad=1")) {
                             logger.log(`正在確認結算頁面`);
-                            await checkInfo(task_page, logger).catch((...args: unknown[]) =>
-                                logger.error(...args),
-                            );
-                            await confirm(task_page, logger, recaptcha).catch(
-                                (...args: unknown[]) => logger.error(...args),
-                            );
-                            if (
-                                (await task_page.$(".card > .section > p")) &&
-                                (await task_page.$eval(".card > .section > p", (elm: HTMLElement) =>
-                                    elm.innerText.includes("成功"),
-                                ))
-                            ) {
+                            await checkInfo(task_page, logger).catch((err) => logger.error(err));
+                            await confirm(task_page, logger, recaptcha).catch((err) => logger.error(err));
+
+                            if (await task_page.$(".card > .section > p") &&
+                                await task_page.$eval(".card > .section > p", (elm) => elm.innerText.includes("成功"))) {
                                 logger.success(`已完成一次抽抽樂：${name} \u001b[92m✔\u001b[m`);
                                 lottery++;
                             } else {
@@ -211,17 +166,16 @@ export default {
 
         return { lottery, unfinished };
     },
-};
+} as Module;
 
-async function getList(page: Page, logger: Logger) {
-    let draws = [];
+async function getList(page: Page, logger: Logger): Promise<{ name: string; link: string }[]> {
+    let draws: { name: any; link: any }[];
 
-    await page
-        .context()
-        .addCookies([{ name: "ckFuli_18UP", value: "1", domain: "fuli.gamer.com.tw", path: "/" }]);
+    await page.context().addCookies([{ name: "ckFuli_18UP", value: "1", domain: "fuli.gamer.com.tw", path: "/" }]);
 
     let attempts = 3;
     while (attempts-- > 0) {
+        draws = [];
         try {
             await page.goto("https://fuli.gamer.com.tw/shop.php?page=1");
             let items = await page.$$("a.items-card");
@@ -349,7 +303,7 @@ async function confirm(page: Page, logger: Logger, recaptcha: any) {
     }
 }
 
-function report({ lottery, unfinished }) {
+function report({ lottery, unfinished }: { lottery: number; unfinished: { [key: string]: any } }) {
     let body = "# 福利社抽抽樂 \n\n";
 
     if (lottery) {
@@ -370,13 +324,7 @@ function report({ lottery, unfinished }) {
     return body;
 }
 
-/**
- * Force reject a promise after a certain amount of time.
- * @param promise
- * @param delay
- * @returns
- */
-function timeout_promise(promise, delay) {
+function timeout_promise(promise: Promise<any>, delay: number) {
     return new Promise((resolve, reject) => {
         setTimeout(() => reject("Timed Out"), delay);
         promise.then(resolve).catch(reject);
