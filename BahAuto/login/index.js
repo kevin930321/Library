@@ -5,58 +5,44 @@ import { MAIN_FRAME, solve } from "recaptcha-solver";
 const { wait_for_cloudflare } = utils;
 
 export default {
-    name: "Login",
-    description: "登入",
-    run: async ({ page, params, shared, logger }) => {
-        let success = false;
-        await page.goto("https://www.gamer.com.tw/");
-        await wait_for_cloudflare(page);
+  name: "Login",
+  description: "登入",
+  run: async ({ page, params, shared, logger }) => {
+    let success = false;
 
-        const max_attempts = +params.max_attempts || +shared.max_attempts || 3;
-        for (let i = 0; i < max_attempts; i++) {
-            try {
-                logger.log("正在檢測登入狀態");
-                await page.goto("https://www.gamer.com.tw/");
-                await page.waitForTimeout(1000);
+    // 設定 User-Agent
+    await page.setUserAgent('Bahadroid (https://www.gamer.com.tw/)');
 
-                let not_login_signal = await page.$("div.TOP-my.TOP-nologin");
-                if (not_login_signal) {
-                    await page.goto("https://user.gamer.com.tw/login.php");
-                    logger.log("登入中 ...");
+    // 嘗試登入 API 端點
+    try {
+      logger.log("正在嘗試登入 API");
+      const response = await page.request.post("https://api.gamer.com.tw/mobile_app/user/v3/do_login.php", {
+        data: {
+          username: params.username,
+          password: params.password,
+          // 其他必要的 API 參數
+        },
+      });
 
-                    const precheck = page.waitForResponse((res) =>
-                        res.url().includes("login_precheck.php"),
-                    );
-                    const uid_locator = page.locator("#form-login input[name=userid]");
-                    const pw_locator = page.locator("#form-login input[type=password]");
+      // 檢查登入結果
+      if (response.status() === 200) {
+        // 處理登入成功情況
+        logger.log("登入成功");
+        success = true;
+      } else {
+        // 處理登入失敗情況
+        logger.error("登入失敗", response.statusText());
+      }
+    } catch (err) {
+      logger.error("登入時發生錯誤", err);
+    }
 
-                    await uid_locator.fill(params.username);
-                    await pw_locator.fill(params.password);
+    if (success) {
+      shared.flags.logged = true;
+    }
 
-                    await precheck;
-
-                    await check_2fa(page, params.twofa, logger);
-                    if (await page.isVisible(MAIN_FRAME)) {
-                        await solve(page).catch((err) => logger.info(err.message));
-                    }
-                    await page.click("#form-login #btn-login");
-                    await page.waitForNavigation({ timeout: 3000 });
-                } else {
-                    logger.log("登入狀態: 已登入");
-                    success = true;
-                    break;
-                }
-            } catch (err) {
-                logger.error("登入時發生錯誤，重新嘗試中", err);
-            }
-        }
-
-        if (success) {
-            shared.flags.logged = true;
-        }
-
-        return { success };
-    },
+    return { success };
+  },
 };
 
 async function check_2fa(page, twofa, logger) {
