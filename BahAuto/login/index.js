@@ -7,11 +7,8 @@ const { wait_for_cloudflare } = utils;
 export default {
   name: "Login",
   description: "登入",
-  run: async ({ page, params, shared, logger, browserContext }) => { 
+  run: async ({ page, params, shared, logger }) => {
     let success = false;
-
-    // 設定 User-Agent
-    await browserContext.setUserAgent('Bahadroid (https://www.gamer.com.tw/)'); // 使用 browserContext 設定 User-Agent
 
     // 嘗試登入 API 端點
     try {
@@ -22,6 +19,9 @@ export default {
           password: params.password,
           // 其他必要的 API 參數
         },
+        headers: {
+          'User-Agent': 'Bahadroid (https://www.gamer.com.tw/)' // 在這裡設定 User-Agent
+        }
       });
 
       // 檢查登入結果
