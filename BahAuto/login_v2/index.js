@@ -3,8 +3,6 @@ import { authenticator } from "otplib";
 
 const { goto } = utils;
 
-const cookies = new Map();
-
 export default {
   name: "Login",
   description: "登入",
@@ -19,21 +17,18 @@ export default {
       const query = new URLSearchParams();
       query.append("uid", params.username);
       query.append("passwd", params.password);
+      query.append("vcode", "6666");
       if (params.twofa?.length) {
         query.append("twoStepAuth", authenticator.generate(params.twofa));
       }
       try {
-        const storedBahaRune = cookies.get("BAHARUNE");
-        const storedBahaEnur = cookies.get("BAHAENUR");
-
         const res = await fetch(
           "https://api.gamer.com.tw/mobile_app/user/v3/do_login.php",
           {
             method: "POST",
             headers: {
               "Content-Type": "application/x-www-form-urlencoded",
-              Cookie: `BAHARUNE=${storedBahaRune}; BAHAENUR=${storedBahaEnur}`,
-              "User-Agent": "Bahadroid (https://www.gamer.com.tw/)",
+              Cookie: "ckAPP_VCODE=6666",
             },
             body: query.toString(),
           }
@@ -41,9 +36,9 @@ export default {
         const body = await res.json();
 
         if (body.userid) {
-          const cookiesString = res.headers.get("set-cookie");
-          bahaRune = cookiesString.split(/(BAHARUNE=\w+)/)[1].split("=")[1];
-          bahaEnur = cookiesString.split(/(BAHAENUR=\w+)/)[1].split("=")[1];
+          const cookies = res.headers.get("set-cookie");
+          bahaRune = cookies.split(/(BAHARUNE=\w+)/)[1].split("=")[1];
+          bahaEnur = cookies.split(/(BAHAENUR=\w+)/)[1].split("=")[1];
           logger.success("✅ 登入成功");
           break;
         } else {
@@ -58,10 +53,6 @@ export default {
     }
 
     if (bahaRune && bahaEnur) {
-      cookies.set("BAHAID", params.username);
-      cookies.set("BAHARUNE", bahaRune);
-      cookies.set("BAHAENUR", bahaEnur);
-
       await goto(page, "home");
       const context = page.context();
       await context.addInitScript(
