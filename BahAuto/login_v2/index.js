@@ -53,53 +53,16 @@ export default {
     }
 
     if (bahaRune && bahaEnur) {
-      // --- 模擬瀏覽器行為 ---
-
-      // 攔截 token 請求
-      await page.route('https://www.gamer.com.tw/ajax/get_csrf_token.php*', async (route) => {
-        const tokenResponse = await page.request.fetch(route.request());
-        const token = await tokenResponse.text();
-        // 在這裡處理 token，例如打印出來
-        console.log('Token:', token); 
-
-        // 繼續處理請求
-        route.continue();
-      });
-
-      // 模擬發送簽到請求
-      await page.evaluate(async (bahaRune) => {
-        // --- 設定 User-Agent ---
-        const originalFetch = window.fetch;
-        window.fetch = async (url, options = {}) => {
-          options.headers = {
-            ...(options.headers || {}),
-            'User-Agent': 'Bahadroid (https://www.gamer.com.tw/)',
-            //  --- 加入 Referer 頭 ---
-            'Referer': 'https://www.gamer.com.tw/',
-            //  --- 加入 Referer 頭 結束 ---
-          };
-          return originalFetch(url, options);
-        };
-        // --- 設定 User-Agent 結束 ---
-
-        const tokenResponse = await fetch('https://www.gamer.com.tw/ajax/get_csrf_token.php');
-        const token = await tokenResponse.text();
-
-        const response = await fetch('https://www.gamer.com.tw/ajax/signin.php', {
-          method: 'POST',
-          headers: {
-            'Cookie': `BAHARUNE=${bahaRune}`,
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: `action=1&token=${encodeURIComponent(token)}`, // 注意 token 需要 URL 編碼
-        });
-
-        const data = await response.json();
-        console.log('Signin response:', data);
-      }, bahaRune);
-
-      // --- 模擬結束 ---
-
+      await goto(page, "home");
+      const context = page.context();
+      await context.addInitScript(
+        ([BAHAID, BAHARUNE, BAHAENUR]) => {
+          document.cookie = `BAHAID=${BAHAID}; path=/; domain=gamer.com.tw`;
+          document.cookie = `BAHARUNE=${BAHARUNE}; path=/; domain=gamer.com.tw`;
+          document.cookie = `BAHAENUR=${BAHAENUR}; path=/; domain=gamer.com.tw`;
+        },
+        [params.username, bahaRune, bahaEnur]
+      );
       await goto(page, "home");
       await page.waitForTimeout(1000);
       logger.success("✅ 登入 Cookie 已載入");
@@ -113,5 +76,5 @@ export default {
     }
 
     return result;
-  },
+  }
 };
