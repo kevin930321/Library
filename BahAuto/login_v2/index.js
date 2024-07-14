@@ -53,17 +53,24 @@ export default {
     }
 
     if (bahaRune && bahaEnur) {
-      await goto(page, "home");
-      const context = page.context();
-      await context.addInitScript(
-        ([BAHAID, BAHARUNE, BAHAENUR]) => {
-          document.cookie = `BAHAID=${BAHAID}; path=/; domain=.gamer.com.tw`;
-          document.cookie = `BAHARUNE=${BAHARUNE}; path=/; domain=.gamer.com.tw`;
-          document.cookie = `BAHAENUR=${BAHAENUR}; path=/; domain=.gamer.com.tw`;
-        },
-        [params.username, bahaRune, bahaEnur]
-      );
-      await goto(page, "home");
+      // 使用 page.setCookie 設定 cookie
+      await page.setCookie({
+        name: "BAHAID",
+        value: params.username,
+        domain: ".gamer.com.tw",
+      },
+      {
+        name: "BAHARUNE",
+        value: bahaRune,
+        domain: ".gamer.com.tw",
+      },
+      {
+        name: "BAHAENUR",
+        value: bahaEnur,
+        domain: ".gamer.com.tw",
+      });
+
+      await goto(page, "home"); // 重新導向到首頁
       await page.waitForTimeout(1000);
       logger.success("✅ 登入 Cookie 已載入");
       result.success = true;
