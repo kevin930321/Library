@@ -56,7 +56,7 @@ export default {
       // --- 模擬瀏覽器行為 ---
 
       // 攔截 token 請求
-      await page.route('https://www.gamer.com.tw/ajax/get_csrf_token.php', async (route) => {
+      await page.route('https://www.gamer.com.tw/ajax/get_csrf_token.php*', async (route) => {
         const tokenResponse = await page.request.fetch(route.request());
         const token = await tokenResponse.text();
         // 在這裡處理 token，例如打印出來
