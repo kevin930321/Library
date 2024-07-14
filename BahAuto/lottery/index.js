@@ -17,7 +17,7 @@ export default {
         const draws = await getList(page, logger);
 
         logger.log(`找到 ${draws.length} 個抽抽樂`);
-        const unfinished = {};
+        const unfinished: { [key: string]: string } = {};
         draws.forEach(({ name, link }, i) => {
             logger.log(`${i + 1}: ${name}`);
             unfinished[name] = link;
@@ -211,10 +211,10 @@ export default {
 
         return { lottery, unfinished };
     },
-};
+} as Module;
 
-async function getList(page: Page, logger: Logger) {
-    let draws = [];
+async function getList(page: Page, logger: Logger): Promise<{ name: string; link: string }[]> {
+    let draws: { name: any; link: any }[];
 
     await page
         .context()
@@ -222,6 +222,7 @@ async function getList(page: Page, logger: Logger) {
 
     let attempts = 3;
     while (attempts-- > 0) {
+        draws = [];
         try {
             await page.goto("https://fuli.gamer.com.tw/shop.php?page=1");
             let items = await page.$$("a.items-card");
@@ -349,7 +350,7 @@ async function confirm(page: Page, logger: Logger, recaptcha: any) {
     }
 }
 
-function report({ lottery, unfinished }) {
+function report({ lottery, unfinished }: { lottery: number; unfinished: { [key: string]: any } }) {
     let body = "# 福利社抽抽樂 \n\n";
 
     if (lottery) {
@@ -376,7 +377,7 @@ function report({ lottery, unfinished }) {
  * @param delay
  * @returns
  */
-function timeout_promise(promise, delay) {
+function timeout_promise(promise: Promise<any>, delay: number) {
     return new Promise((resolve, reject) => {
         setTimeout(() => reject("Timed Out"), delay);
         promise.then(resolve).catch(reject);
