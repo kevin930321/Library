@@ -1,6 +1,6 @@
 import { fetch, utils } from "bahamut-automation";
 import { authenticator } from "otplib";
-import localStorage from 'localstorage-polyfill';
+import { localStorage } from 'localstorage-polyfill'; // 引入 localstorage-polyfill
 
 const { goto } = utils;
 
@@ -23,6 +23,12 @@ export default {
         query.append("twoStepAuth", authenticator.generate(params.twofa));
       }
       try {
+        // 初始化 localstorage-polyfill
+        localStorage.config({
+          deserializer: (value) => JSON.parse(value),
+          serializer: (value) => JSON.stringify(value)
+        });
+
         // 從 localStorage 載入 Cookie
         const storedBahaRune = localStorage.getItem("BAHARUNE");
         const storedBahaEnur = localStorage.getItem("BAHAENUR");
