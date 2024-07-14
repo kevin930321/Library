@@ -7,11 +7,11 @@ const { wait_for_cloudflare } = utils;
 export default {
   name: "Login",
   description: "登入",
-  run: async ({ page, params, shared, logger }) => {
+  run: async ({ page, params, shared, logger, browserContext }) => { // 注意這裡增加了 browserContext
     let success = false;
 
     // 設定 User-Agent
-    await page.setUserAgent('Bahadroid (https://www.gamer.com.tw/)');
+    await browserContext.setUserAgent('Bahadroid (https://www.gamer.com.tw/)'); // 使用 browserContext 設定 User-Agent
 
     // 嘗試登入 API 端點
     try {
