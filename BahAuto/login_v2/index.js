@@ -53,13 +53,38 @@ export default {
     }
 
     if (bahaRune && bahaEnur) {
-      // --- 改這裡就對了！ ---
-      await page.context().addCookies([
-        { name: 'BAHAID', value: params.username, domain: '.gamer.com.tw', path: '/' },
-        { name: 'BAHARUNE', value: bahaRune, domain: '.gamer.com.tw', path: '/' },
-        { name: 'BAHAENUR', value: bahaEnur, domain: '.gamer.com.tw', path: '/' },
-      ]);
-      // --- 改到這裡 ---
+      // --- 模擬瀏覽器行為 ---
+
+      // 攔截 token 請求
+      await page.route('https://www.gamer.com.tw/ajax/get_csrf_token.php', async (route) => {
+        const tokenResponse = await page.request.fetch(route.request());
+        const token = await tokenResponse.text();
+        // 在這裡處理 token，例如打印出來
+        console.log('Token:', token); 
+
+        // 繼續處理請求
+        route.continue();
+      });
+
+      // 模擬發送簽到請求
+      await page.evaluate(async (bahaRune) => {
+        const tokenResponse = await fetch('https://www.gamer.com.tw/ajax/get_csrf_token.php');
+        const token = await tokenResponse.text();
+
+        const response = await fetch('https://www.gamer.com.tw/ajax/signin.php', {
+          method: 'POST',
+          headers: {
+            'Cookie': `BAHARUNE=${bahaRune}`,
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: `action=1&token=${encodeURIComponent(token)}`, // 注意 token 需要 URL 編碼
+        });
+
+        const data = await response.json();
+        console.log('Signin response:', data);
+      }, bahaRune);
+
+      // --- 模擬結束 ---
 
       await goto(page, "home");
       await page.waitForTimeout(1000);
@@ -74,5 +99,5 @@ export default {
     }
 
     return result;
-  }
+  },
 };
