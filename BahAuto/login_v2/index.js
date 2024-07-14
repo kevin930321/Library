@@ -22,14 +22,19 @@ export default {
         query.append("twoStepAuth", authenticator.generate(params.twofa));
       }
       try {
+        // 從 localStorage 載入 Cookie
+        const storedBahaRune = localStorage.getItem("BAHARUNE");
+        const storedBahaEnur = localStorage.getItem("BAHAENUR");
+
+        // 使用 Cookie 發送請求
         const res = await fetch(
           "https://api.gamer.com.tw/mobile_app/user/v3/do_login.php",
           {
             method: "POST",
             headers: {
               "Content-Type": "application/x-www-form-urlencoded",
+              Cookie: `BAHARUNE=${storedBahaRune}; BAHAENUR=${storedBahaEnur}`,
               "User-Agent": "Bahadroid (https://www.gamer.com.tw/)",
-              Cookie: "ckAPP_VCODE=6666",
             },
             body: query.toString(),
           }
@@ -54,6 +59,11 @@ export default {
     }
 
     if (bahaRune && bahaEnur) {
+      // 儲存 Cookie 到 localStorage
+      localStorage.setItem("BAHAID", params.username);
+      localStorage.setItem("BAHARUNE", bahaRune);
+      localStorage.setItem("BAHAENUR", bahaEnur);
+
       await goto(page, "home");
       const context = page.context();
       await context.addInitScript(
