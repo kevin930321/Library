@@ -3,7 +3,6 @@ import { authenticator } from "otplib";
 
 const { goto } = utils;
 
-// 使用 Map 存储 Cookie
 const cookies = new Map();
 
 export default {
@@ -20,17 +19,13 @@ export default {
       const query = new URLSearchParams();
       query.append("uid", params.username);
       query.append("passwd", params.password);
-      // 移除 vcode 
-      // query.append("vcode", params.vcode);
       if (params.twofa?.length) {
         query.append("twoStepAuth", authenticator.generate(params.twofa));
       }
       try {
-        // 从 cookies 中载入 Cookie
         const storedBahaRune = cookies.get("BAHARUNE");
         const storedBahaEnur = cookies.get("BAHAENUR");
 
-        // 使用 Cookie 发送请求
         const res = await fetch(
           "https://api.gamer.com.tw/mobile_app/user/v3/do_login.php",
           {
@@ -45,7 +40,6 @@ export default {
         );
         const body = await res.json();
 
-        // 检查登入结果
         if (body.userid) {
           const cookiesString = res.headers.get("set-cookie");
           bahaRune = cookiesString.split(/(BAHARUNE=\w+)/)[1].split("=")[1];
@@ -53,12 +47,6 @@ export default {
           logger.success("✅ 登入成功");
           break;
         } else {
-          // 处理登入失败的情况
-          if (body.message === "驗證碼錯誤") {
-            logger.error("❌ 驗證碼錯誤，請重新輸入！");
-          } else {
-            logger.error("❌ 登入失敗: ", body.message);
-          }
           result = body.message;
         }
       } catch (err) {
@@ -70,7 +58,6 @@ export default {
     }
 
     if (bahaRune && bahaEnur) {
-      // 存储 Cookie 到 cookies 中
       cookies.set("BAHAID", params.username);
       cookies.set("BAHARUNE", bahaRune);
       cookies.set("BAHAENUR", bahaEnur);
@@ -97,7 +84,6 @@ export default {
       shared.flags.logged = true;
     }
 
-    // 返回登入结果
     return result;
   }
 };
