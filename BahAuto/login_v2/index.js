@@ -36,15 +36,9 @@ export default {
         const body = await res.json();
 
         if (body.userid) {
-          const cookies = res.headers.raw()["set-cookie"];
-          for (const cookie of cookies) {
-            if (cookie.includes("BAHARUNE")) {
-              bahaRune = cookie.match(/BAHARUNE=(\w+)/)[1];
-            }
-            if (cookie.includes("BAHAENUR")) {
-              bahaEnur = cookie.match(/BAHAENUR=(\w+)/)[1];
-            }
-          }
+          const cookies = res.headers.get("set-cookie");
+          bahaRune = cookies.split(/(BAHARUNE=\w+)/)[1].split("=")[1];
+          bahaEnur = cookies.split(/(BAHAENUR=\w+)/)[1].split("=")[1];
           logger.success("✅ 登入成功");
           break;
         } else {
@@ -69,20 +63,10 @@ export default {
         },
         [params.username, bahaRune, bahaEnur]
       );
-      await page.reload();
+      await goto(page, "home");
       await page.waitForTimeout(1000);
-
-      // 新增：檢查登入狀態
-      const loggedIn = await page.evaluate(() => {
-        return document.cookie.includes('BAHARUNE') && document.cookie.includes('BAHAENUR');
-      });
-      if (loggedIn) {
-        logger.success("✅ 登入 Cookie 已載入且檢查成功");
-        result.success = true;
-      } else {
-        logger.error("❌ Cookie 檢查失敗");
-        result.success = false;
-      }
+      logger.success("✅ 登入 Cookie 已載入");
+      result.success = true;
     } else {
       result.success = false;
     }
