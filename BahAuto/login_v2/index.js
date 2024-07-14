@@ -28,6 +28,7 @@ export default {
             method: "POST",
             headers: {
               "Content-Type": "application/x-www-form-urlencoded",
+              "User-Agent": "Bahadroid (https://www.gamer.com.tw/)",
               Cookie: "ckAPP_VCODE=6666",
             },
             body: query.toString(),
