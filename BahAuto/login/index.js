@@ -9,34 +9,66 @@ export default {
   description: "登入",
   run: async ({ page, params, shared, logger }) => {
     let success = false;
+    await page.goto("https://www.gamer.com.tw/");
+    await wait_for_cloudflare(page);
 
-    // 嘗試登入 API 端點
+    const max_attempts = +params.max_attempts || +shared.max_attempts || 3;
+    for (let i = 0; i < max_attempts; i++) {
+      try {
+        logger.log("正在檢測登入狀態");
+        await page.goto("https://www.gamer.com.tw/");
+        await page.waitForTimeout(1000);
+
+        let not_login_signal = await page.$("div.TOP-my.TOP-nologin");
+        if (not_login_signal) {
+          await page.goto("https://user.gamer.com.tw/login.php");
+          logger.log("登入中 ...");
+
+          const precheck = page.waitForResponse((res) =>
+            res.url().includes("login_precheck.php"),
+          );
+          const uid_locator = page.locator("#form-login input[name=userid]");
+          const pw_locator = page.locator("#form-login input[type=password]");
+
+          await uid_locator.fill(params.username);
+          await pw_locator.fill(params.password);
+
+          await precheck;
+
+          await check_2fa(page, params.twofa, logger);
+          if (await page.isVisible(MAIN_FRAME)) {
+            await solve(page).catch((err) => logger.info(err.message));
+          }
+          await page.click("#form-login #btn-login");
+          await page.waitForNavigation({ timeout: 3000 });
+        } else {
+          logger.log("登入狀態: 已登入");
+          success = true;
+          break;
+        }
+      } catch (err) {
+        logger.error("登入時發生錯誤，重新嘗試中", err);
+      }
+    }
+
+    // 尝试使用 API 登录
     try {
       logger.log("正在嘗試登入 API");
 
-      // 1. 訪問登入頁面，获取必要的 Cookie
-      await page.goto("https://www.gamer.com.tw/");
-      await wait_for_cloudflare(page);
-
-      // 2. 获取必要的 Cookie，这里需要根据实际情况进行调整
-      const vcodeCookie = await page.evaluate(() => {
-        return document.cookie.match(/ckAPP_VCODE=([^;]+)/)[1];
-      });
-
-      // 3. 发出 API 请求
+      // 使用 API 尝试登入
       const response = await page.request.post("https://api.gamer.com.tw/mobile_app/user/v3/do_login.php", {
         data: {
           uid: params.username, // 使用 params.username 获取用户名
           passwd: params.password, // 使用 params.password 获取密码
-          vcode: vcodeCookie // 使用获取的 Cookie 中的 vcode
+          vcode: '6666' // 使用固定的 vcode
         },
         headers: {
           'User-Agent': 'Bahadroid (https://www.gamer.com.tw/)',
-          'Cookie': `ckAPP_VCODE=${vcodeCookie}`
+          'Cookie': 'ckAPP_VCODE=6666'
         }
       });
 
-      // 4. 檢查登入結果
+      // 檢查登入結果
       if (response.status() === 200) {
         // 處理登入成功情況
         logger.log("登入成功");
