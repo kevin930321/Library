@@ -35,8 +35,7 @@ var lottery_default = {
             "X-Bahamut-App-Version": "932",
             "X-Bahamut-App-Android": "tw.com.gamer.android.activecenter",
             "Connection": "Keep-Alive",
-            "accept-encoding": "gzip",
-            "cookie": "ckAPP_VCODE=7045",
+            "accept-encoding": "gzip"
         });
         const recaptcha = { process: false };
         task_page.on("response", async (response) => {
