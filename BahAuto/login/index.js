@@ -29,7 +29,6 @@ export default {
             "Cookie": "ckAPP_VCODE=6666",
             "X-Bahamut-App-Version": "932",
             "X-Bahamut-App-Android": "tw.com.gamer.android.activecenter",
-            "device_type": "ios",
           },
         });
 
