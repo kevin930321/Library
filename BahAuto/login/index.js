@@ -14,7 +14,7 @@ export default {
       const query = new URLSearchParams();
       query.append("uid", params.username);
       query.append("passwd", params.password);
-      query.append("vcode", "6666"); 
+      query.append("vcode", "7045"); 
       if (params.twofa?.length) {
         query.append("twoStepAuth", authenticator.generate(params.twofa));
       }
