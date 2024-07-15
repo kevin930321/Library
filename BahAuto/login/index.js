@@ -26,8 +26,12 @@ export default {
           data: query.toString(),
           headers: {
             "Content-Type": "application/x-www-form-urlencoded",
+            // 偽裝 Android 裝置資訊
             "User-Agent": "Bahadroid (https://www.gamer.com.tw/)",
-            "Cookie": "ckAPP_VCODE=6666" 
+            "Cookie": "ckAPP_VCODE=6666",
+            "X-Bahamut-App-Version": "932", //  請替換成你的 App 版本
+            "X-Bahamut-App-Android": "tw.com.gamer.android.activecenter", // 請替換成你的 App ID
+            "device_type": "android",
           },
         });
 
