@@ -29,10 +29,14 @@ var lottery_default = {
         const { link, name } = draws[idx];
         const task_page = await context.newPage();
         await task_page.setExtraHTTPHeaders({
+            "Content-Type": "application/x-www-form-urlencoded",
             "User-Agent": "Bahadroid (https://www.gamer.com.tw/)",
             "x-bahamut-app-instanceid": "cc2zQIfDpg4",
             "X-Bahamut-App-Version": "932",
-            "X-Bahamut-App-Android": "tw.com.gamer.android.activecenter"
+            "X-Bahamut-App-Android": "tw.com.gamer.android.activecenter",
+            "Connection": "Keep-Alive",
+            "accept-encoding": "gzip",
+            "cookie": "ckAPP_VCODE=7045",
         });
         const recaptcha = { process: false };
         task_page.on("response", async (response) => {
