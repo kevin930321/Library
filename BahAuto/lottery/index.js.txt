@@ -293,7 +293,7 @@ function report({ lottery, unfinished }) {
     body += "🟢 所有抽獎皆已完成\n";
   }
   Object.keys(unfinished).forEach((key) => {
-    if (unfinished[key] === void 0) 
+    if (unfinished[key] === void 0)
       return;
     body += `❌ 未能自動完成所有 ***[${key}](${unfinished[key]})*** 的抽獎
 `;
