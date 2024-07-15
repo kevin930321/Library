@@ -5,58 +5,64 @@ import { MAIN_FRAME, solve } from "recaptcha-solver";
 const { wait_for_cloudflare } = utils;
 
 export default {
-    name: "Login",
-    description: "登入",
-    run: async ({ page, params, shared, logger }) => {
-        let success = false;
-        await page.goto("https://www.gamer.com.tw/");
-        await wait_for_cloudflare(page);
+  name: "Login",
+  description: "登入",
+  run: async ({ page, params, shared, logger }) => {
+    let success = false;
 
-        const max_attempts = +params.max_attempts || +shared.max_attempts || 3;
-        for (let i = 0; i < max_attempts; i++) {
-            try {
-                logger.log("正在檢測登入狀態");
-                await page.goto("https://www.gamer.com.tw/");
-                await page.waitForTimeout(1000);
+    // 嘗試登入 API 端點
+    try {
+      logger.log("正在嘗試登入 API");
 
-                let not_login_signal = await page.$("div.TOP-my.TOP-nologin");
-                if (not_login_signal) {
-                    await page.goto("https://user.gamer.com.tw/login.php");
-                    logger.log("登入中 ...");
+      // 1. 訪問登入頁面，获取必要的 Cookie
+      await page.goto("https://www.gamer.com.tw/");
+      await wait_for_cloudflare(page);
 
-                    const precheck = page.waitForResponse((res) =>
-                        res.url().includes("login_precheck.php"),
-                    );
-                    const uid_locator = page.locator("#form-login input[name=userid]");
-                    const pw_locator = page.locator("#form-login input[type=password]");
+      // 2. 获取必要的 Cookie，这里需要根据实际情况进行调整
+      const vcodeCookie = await page.evaluate(() => {
+        return document.cookie.match(/ckAPP_VCODE=([^;]+)/)[1];
+      });
 
-                    await uid_locator.fill(params.username);
-                    await pw_locator.fill(params.password);
-
-                    await precheck;
-
-                    await check_2fa(page, params.twofa, logger);
-                    if (await page.isVisible(MAIN_FRAME)) {
-                        await solve(page).catch((err) => logger.info(err.message));
-                    }
-                    await page.click("#form-login #btn-login");
-                    await page.waitForNavigation({ timeout: 3000 });
-                } else {
-                    logger.log("登入狀態: 已登入");
-                    success = true;
-                    break;
-                }
-            } catch (err) {
-                logger.error("登入時發生錯誤，重新嘗試中", err);
-            }
+      // 3. 发出 API 请求
+      const response = await page.request.post("https://api.gamer.com.tw/mobile_app/user/v3/do_login.php", {
+        data: {
+          uid: params.username, // 使用 params.username 获取用户名
+          passwd: params.password, // 使用 params.password 获取密码
+          vcode: vcodeCookie // 使用获取的 Cookie 中的 vcode
+        },
+        headers: {
+          'User-Agent': 'Bahadroid (https://www.gamer.com.tw/)',
+          'Cookie': `ckAPP_VCODE=${vcodeCookie}`
         }
+      });
 
-        if (success) {
-            shared.flags.logged = true;
+      // 4. 檢查登入結果
+      if (response.status() === 200) {
+        // 處理登入成功情況
+        logger.log("登入成功");
+        success = true;
+
+        // 获取 BAHARUNE Cookie
+        const BAHARUNE = response.headers()['Set-Cookie'].find(cookie => /BAHARUNE/.test(cookie));
+        if (BAHARUNE) {
+          const BAHARUNEValue = BAHARUNE.match(/(?<=BAHARUNE=)[^;]*(?=;)/)[0];
+          // 将 BAHARUNE Cookie 保存到 shared 对象中
+          shared.flags.BAHARUNE = BAHARUNEValue;
         }
+      } else {
+        // 處理登入失敗情況
+        logger.error("登入失敗", response.statusText());
+      }
+    } catch (err) {
+      logger.error("登入時發生錯誤", err);
+    }
 
-        return { success };
-    },
+    if (success) {
+      shared.flags.logged = true;
+    }
+
+    return { success };
+  },
 };
 
 async function check_2fa(page, twofa, logger) {
