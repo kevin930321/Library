@@ -1,9 +1,9 @@
-const { Logger, Module } = require("bahamut-automation");
-const { ElementHandle, Frame, Page } = require("playwright-core");
-const { NotFoundError, solve } = require("recaptcha-solver");
-const { Pool } = require("@jacoblincool/puddle");
+import { Logger, Module } from "bahamut-automation";
+import { ElementHandle, Frame, Page } from "playwright-core";
+import { NotFoundError, solve } from "recaptcha-solver";
+import { Pool } from "@jacoblincool/puddle";
 
-module.exports = {
+export default {
   name: "福利社",
   description: "福利社抽獎",
   async run({ page, shared, params, logger }) {
@@ -104,10 +104,12 @@ module.exports = {
               await task_page.$$eval(
                 "#dialogify_1 .dialogify__body a",
                 (options) => {
-                  options.forEach((option) => {
-                    if (option.dataset.option == option.dataset.answer)
-                      option.click();
-                  });
+                  options.forEach(
+                    (option) => {
+                      if (option.dataset.option == option.dataset.answer)
+                        option.click();
+                    },
+                  );
                 },
               );
               await task_page.waitForSelector("#btn-buy");
@@ -148,9 +150,9 @@ module.exports = {
               await task_page.waitForTimeout(1000);
               const ad_iframe = (await task_page
                 .$("ins iframe")
-                .catch((...args) => logger.error(...args))) as ElementHandle<
-                HTMLIFrameElement
-              >;
+                .catch((...args) =>
+                  logger.error(...args),
+                )) as ElementHandle<HTMLIFrameElement>;
               try {
                 ad_frame = await ad_iframe.contentFrame();
                 await shared.ad_handler({ ad_frame });
@@ -177,9 +179,7 @@ module.exports = {
                   elm.innerText.includes("成功"),
                 ))
               ) {
-                logger.success(
-                  `已完成一次抽抽樂：${name} \u001b[92m✔\u001b[m`,
-                );
+                logger.success(`已完成一次抽抽樂：${name} \u001b[92m✔\u001b[m`);
                 lottery++;
               } else {
                 logger.error("發生錯誤，重試中 \u001b[91m✘\u001b[m");
@@ -213,14 +213,9 @@ module.exports = {
 async function getList(page, logger) {
   let draws;
 
-  await page.context().addCookies([
-    {
-      name: "ckFuli_18UP",
-      value: "1",
-      domain: "fuli.gamer.com.tw",
-      path: "/",
-    },
-  ]);
+  await page
+    .context()
+    .addCookies([{ name: "ckFuli_18UP", value: "1", domain: "fuli.gamer.com.tw", path: "/" }]);
 
   let attempts = 3;
   while (attempts-- > 0) {
@@ -243,12 +238,15 @@ async function getList(page, logger) {
       }
 
       while (
-        await page.$eval("a.pagenow", (elm) => (elm.nextSibling ? true : false))
+        await page.$eval("a.pagenow", (elm) =>
+          elm.nextSibling ? true : false,
+        )
       ) {
         await page.goto(
           "https://fuli.gamer.com.tw/shop.php?page=" +
-            (await page.$eval("a.pagenow", (elm) =>
-              (elm.nextSibling as HTMLElement).innerText,
+            (await page.$eval(
+              "a.pagenow",
+              (elm) => (elm.nextSibling as HTMLElement).innerText,
             )),
         );
         let items = await page.$$("a.items-card");
@@ -300,10 +298,7 @@ async function checkInfo(page, logger) {
 async function confirm(page, logger, recaptcha) {
   try {
     await page.waitForSelector("input[name='agreeConfirm']", { state: "attached" });
-    if (
-      (await (await page.$("input[name='agreeConfirm']")).getAttribute("checked")) ===
-      null
-    ) {
+    if ((await (await page.$("input[name='agreeConfirm']")).getAttribute("checked")) === null) {
       await page.click("text=我已閱讀注意事項，並確認兌換此商品");
     }
     await page.waitForTimeout(100);
