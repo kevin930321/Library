@@ -56,7 +56,8 @@ var lottery_default = {
               await Promise.all([
                 task_page.waitForResponse(/ajax\/check_ad.php/, { timeout: 5e3 }).catch(() => {
                 }),
-                task_page.click("text=看廣告免費兌換").catch(() => {}),
+                task_page.click("text=看廣告免費兌換").catch(() => {
+                }),
                 task_page.waitForSelector(".fuli-ad__qrcode", {
                   timeout: 5e3
                 }).catch(() => {
@@ -64,7 +65,7 @@ var lottery_default = {
               ]);
               const chargingText = await task_page.$eval(
                 ".dialogify .dialogify__body p",
-                (elm) => elm.innerText,
+                (elm) => elm.innerText
               ).catch(() => {
               }) || "";
               if (chargingText.includes("廣告能量補充中")) {
@@ -76,7 +77,7 @@ var lottery_default = {
             }
             if (await task_page.$eval(
               ".dialogify",
-              (elm) => elm.textContent.includes("勇者問答考驗"),
+              (elm) => elm.textContent.includes("勇者問答考驗")
             ).catch(() => { 
             })) {
               logger.info(`需要回答問題，正在回答問題`);
@@ -138,7 +139,7 @@ var lottery_default = {
               await confirm(task_page, logger, recaptcha).catch(
                 (...args) => logger.error(...args)
               );
-              if (await task_page.$(".card > .section > p")) && await task_page.$eval(
+              if (await task_page.$(".card > .section > p") && await task_page.$eval(
                 ".card > .section > p",
                 (elm) => elm.innerText.includes("成功")
               )) {
@@ -194,7 +195,7 @@ async function getList(page, logger) {
         (elm) => elm.nextSibling ? true : false
       )) {
         await page.goto(
-          "https://fuli.gamer.com.tw/shop.php?page=" + (await page.$eval(
+          "https://fuli.gamer.com.tw/shop.php?page=" + await page.$eval(
             "a.pagenow",
             (elm) => elm.nextSibling.innerText
           )
