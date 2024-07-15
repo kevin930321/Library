@@ -1,18 +1,18 @@
 import { NotFoundError, solve } from "recaptcha-solver";
 import { Pool } from "@jacoblincool/puddle";
 var lottery_default = {
-  name: "\u798F\u5229\u793E",
-  description: "\u798F\u5229\u793E\u62BD\u734E",
+  name: "福利社",
+  description: "福利社抽獎",
   async run({ page, shared, params, logger }) {
     if (!shared.flags.logged)
-      throw new Error("\u4F7F\u7528\u8005\u672A\u767B\u5165\uFF0C\u7121\u6CD5\u62BD\u734E");
+      throw new Error("使用者未登入，無法抽獎");
     if (!shared.ad_handler)
-      throw new Error("\u9700\u4F7F\u7528 ad_handler \u6A21\u7D44");
-    logger.log(`\u958B\u59CB\u57F7\u884C`);
+      throw new Error("需使用 ad_handler 模組");
+    logger.log(`開始執行`);
     let lottery = 0;
-    logger.log("\u6B63\u5728\u5C0B\u627E\u62BD\u62BD\u6A02");
+    logger.log("正在尋找抽抽樂");
     const draws = await getList(page, logger);
-    logger.log(`\u627E\u5230 ${draws.length} \u500B\u62BD\u62BD\u6A02`);
+    logger.log(`找到 ${draws.length} 個抽抽樂`);
     const unfinished = {};
     draws.forEach(({ name, link }, i) => {
       logger.log(`${i + 1}: ${name}`);
@@ -47,7 +47,7 @@ var lottery_default = {
             await task_page.waitForSelector("#BH-master > .BH-lbox.fuli-pbox h1");
             await task_page.waitForTimeout(100);
             if (await task_page.$(".btn-base.c-accent-o.is-disable")) {
-              logger.log(`${name} \u7684\u5EE3\u544A\u514D\u8CBB\u6B21\u6578\u5DF2\u7528\u5B8C \x1B[92m\u2714\x1B[m`);
+              logger.log(`${name} 的廣告免費次數已用完 \u001b[92m✔\u001b[m`);
               delete unfinished[name];
               break;
             }
@@ -56,7 +56,7 @@ var lottery_default = {
               await Promise.all([
                 task_page.waitForResponse(/ajax\/check_ad.php/, { timeout: 5e3 }).catch(() => {
                 }),
-                task_page.click("text=\u770B\u5EE3\u544A\u514D\u8CBB\u514C\u63DB").catch(() => {
+                task_page.click("text=看廣告免費兌換").catch(() => {
                 }),
                 task_page.waitForSelector(".fuli-ad__qrcode", {
                   timeout: 5e3
@@ -68,19 +68,19 @@ var lottery_default = {
                 (elm) => elm.innerText
               ).catch(() => {
               }) || "";
-              if (chargingText.includes("\u5EE3\u544A\u80FD\u91CF\u88DC\u5145\u4E2D")) {
-                logger.info(`\u5EE3\u544A\u80FD\u91CF\u88DC\u5145\u4E2D\uFF0C\u91CD\u8A66 (${retried}/${CHANGING_RETRY})`);
-                await task_page.click("button:has-text('\u95DC\u9589')");
+              if (chargingText.includes("廣告能量補充中")) {
+                logger.info(`廣告能量補充中，重試 (${retried}/${CHANGING_RETRY})`);
+                await task_page.click("button:has-text('關閉')");
                 continue;
               }
               break;
             }
             if (await task_page.$eval(
               ".dialogify",
-              (elm) => elm.textContent.includes("\u52C7\u8005\u554F\u7B54\u8003\u9A57")
+              (elm) => elm.textContent.includes("勇者問答考驗")
             ).catch(() => {
             })) {
-              logger.info(`\u9700\u8981\u56DE\u7B54\u554F\u984C\uFF0C\u6B63\u5728\u56DE\u7B54\u554F\u984C`);
+              logger.info(`需要回答問題，正在回答問題`);
               await task_page.$$eval(
                 "#dialogify_1 .dialogify__body a",
                 (options) => {
@@ -99,7 +99,7 @@ var lottery_default = {
             await Promise.all([
               task_page.waitForSelector(".dialogify .dialogify__body p", { timeout: 5e3 }).catch(() => {
               }),
-              task_page.waitForSelector("button:has-text('\u78BA\u5B9A')", { timeout: 5e3 }).catch(() => {
+              task_page.waitForSelector("button:has-text('確定')", { timeout: 5e3 }).catch(() => {
               })
             ]);
             const ad_status = await task_page.$eval(
@@ -108,13 +108,13 @@ var lottery_default = {
             ).catch(() => {
             }) || "";
             let ad_frame;
-            if (ad_status.includes("\u5EE3\u544A\u80FD\u91CF\u88DC\u5145\u4E2D")) {
-              logger.error("\u5EE3\u544A\u80FD\u91CF\u88DC\u5145\u4E2D");
+            if (ad_status.includes("廣告能量補充中")) {
+              logger.error("廣告能量補充中");
               await task_page.reload().catch((...args) => logger.error(...args));
               continue;
-            } else if (ad_status.includes("\u89C0\u770B\u5EE3\u544A")) {
-              logger.log(`\u6B63\u5728\u89C0\u770B\u5EE3\u544A`);
-              await task_page.click('button:has-text("\u78BA\u5B9A")');
+            } else if (ad_status.includes("觀看廣告")) {
+              logger.log(`正在觀看廣告`);
+              await task_page.click('button:has-text("確定")');
               await task_page.waitForSelector("ins iframe").catch((...args) => logger.error(...args));
               await task_page.waitForTimeout(1e3);
               const ad_iframe = await task_page.$("ins iframe").catch(
@@ -132,7 +132,7 @@ var lottery_default = {
             }
             const final_url = task_page.url();
             if (final_url.includes("/buyD.php") && final_url.includes("ad=1")) {
-              logger.log(`\u6B63\u5728\u78BA\u8A8D\u7D50\u7B97\u9801\u9762`);
+              logger.log(`正在確認結算頁面`);
               await checkInfo(task_page, logger).catch(
                 (...args) => logger.error(...args)
               );
@@ -141,16 +141,16 @@ var lottery_default = {
               );
               if (await task_page.$(".card > .section > p") && await task_page.$eval(
                 ".card > .section > p",
-                (elm) => elm.innerText.includes("\u6210\u529F")
+                (elm) => elm.innerText.includes("成功")
               )) {
-                logger.success(`\u5DF2\u5B8C\u6210\u4E00\u6B21\u62BD\u62BD\u6A02\uFF1A${name} \x1B[92m\u2714\x1B[m`);
+                logger.success(`已完成一次抽抽樂：${name} \u001b[92m✔\u001b[m`);
                 lottery++;
               } else {
-                logger.error("\u767C\u751F\u932F\u8AA4\uFF0C\u91CD\u8A66\u4E2D \x1B[91m\u2718\x1B[m");
+                logger.error("發生錯誤，重試中 \u001b[91m✘\u001b[m");
               }
             } else {
               logger.warn(final_url);
-              logger.error("\u672A\u9032\u5165\u7D50\u7B97\u9801\u9762\uFF0C\u91CD\u8A66\u4E2D \x1B[91m\u2718\x1B[m");
+              logger.error("未進入結算頁面，重試中 \u001b[91m✘\u001b[m");
             }
           } catch (err) {
             logger.error("!", err);
@@ -161,9 +161,9 @@ var lottery_default = {
     }
     await pool.go();
     await page.waitForTimeout(2e3);
-    logger.log(`\u57F7\u884C\u5B8C\u7562 \u2728`);
+    logger.log(`執行完畢 ✨`);
     if (shared.report) {
-      shared.report.reports["\u798F\u5229\u793E\u62BD\u734E"] = report({ lottery, unfinished });
+      shared.report.reports["福利社抽獎"] = report({ lottery, unfinished });
     }
     return { lottery, unfinished };
   }
@@ -179,7 +179,7 @@ async function getList(page, logger) {
       let items = await page.$$("a.items-card");
       for (let i = items.length - 1; i >= 0; i--) {
         let is_draw = await items[i].evaluate(
-          (elm) => elm.innerHTML.includes("\u62BD\u62BD\u6A02")
+          (elm) => elm.innerHTML.includes("抽抽樂")
         );
         if (is_draw) {
           draws.push({
@@ -203,7 +203,7 @@ async function getList(page, logger) {
         let items2 = await page.$$("a.items-card");
         for (let i = items2.length - 1; i >= 0; i--) {
           let is_draw = await items2[i].evaluate(
-            (node) => node.innerHTML.includes("\u62BD\u62BD\u6A02")
+            (node) => node.innerHTML.includes("抽抽樂")
           );
           if (is_draw) {
             draws.push({
@@ -230,17 +230,17 @@ async function checkInfo(page, logger) {
     const country = await page.$eval("[name=country]", (elm) => elm.value);
     const address = await page.$eval("#address", (elm) => elm.value);
     if (!name)
-      logger.log("\u7121\u6536\u4EF6\u4EBA\u59D3\u540D");
+      logger.log("無收件人姓名");
     if (!tel)
-      logger.log("\u7121\u6536\u4EF6\u4EBA\u96FB\u8A71");
+      logger.log("無收件人電話");
     if (!city)
-      logger.log("\u7121\u6536\u4EF6\u4EBA\u57CE\u5E02");
+      logger.log("無收件人城市");
     if (!country)
-      logger.log("\u7121\u6536\u4EF6\u4EBA\u5340\u57DF");
+      logger.log("無收件人區域");
     if (!address)
-      logger.log("\u7121\u6536\u4EF6\u4EBA\u5730\u5740");
+      logger.log("無收件人地址");
     if (!name || !tel || !city || !country || !address)
-      throw new Error("\u8B66\u544A\uFF1A\u6536\u4EF6\u4EBA\u8CC7\u6599\u4E0D\u5168");
+      throw new Error("警告：收件人資料不全");
   } catch (err) {
     logger.error(err);
   }
@@ -249,15 +249,15 @@ async function confirm(page, logger, recaptcha) {
   try {
     await page.waitForSelector("input[name='agreeConfirm']", { state: "attached" });
     if (await (await page.$("input[name='agreeConfirm']")).getAttribute("checked") === null) {
-      await page.click("text=\u6211\u5DF2\u95B1\u8B80\u6CE8\u610F\u4E8B\u9805\uFF0C\u4E26\u78BA\u8A8D\u514C\u63DB\u6B64\u5546\u54C1");
+      await page.click("text=我已閱讀注意事項，並確認兌換此商品");
     }
     await page.waitForTimeout(100);
-    await page.waitForSelector("a:has-text('\u78BA\u8A8D\u514C\u63DB')");
-    await page.click("a:has-text('\u78BA\u8A8D\u514C\u63DB')");
+    await page.waitForSelector("a:has-text('確認兌換')");
+    await page.click("a:has-text('確認兌換')");
     const next_navigation = page.waitForNavigation().catch(() => {
     });
-    await page.waitForSelector("button:has-text('\u78BA\u5B9A')");
-    await page.click("button:has-text('\u78BA\u5B9A')");
+    await page.waitForSelector("button:has-text('確定')");
+    await page.click("button:has-text('確定')");
     await page.waitForTimeout(300);
     if (recaptcha.process === true) {
       const recaptcha_frame_width = await page.$eval(
@@ -265,7 +265,7 @@ async function confirm(page, logger, recaptcha) {
         (elm) => getComputedStyle(elm).width
       );
       if (recaptcha_frame_width !== "100%") {
-        logger.log("\u9700\u8981\u8655\u7406 reCAPTCHA");
+        logger.log("需要處理 reCAPTCHA");
         try {
           await timeout_promise(solve(page, { delay: 64 }), 3e4);
         } catch (err) {
@@ -274,7 +274,7 @@ async function confirm(page, logger, recaptcha) {
           }
           throw err;
         }
-        logger.log("reCAPTCHA \u81EA\u52D5\u8655\u7406\u5B8C\u6210");
+        logger.log("reCAPTCHA 自動處理完成");
       }
     }
     await next_navigation;
@@ -284,18 +284,18 @@ async function confirm(page, logger, recaptcha) {
   }
 }
 function report({ lottery, unfinished }) {
-  let body = "# \u798F\u5229\u793E\u62BD\u62BD\u6A02 \n\n";
+  let body = "# 福利社抽抽樂 \n\n";
   if (lottery) {
-    body += `\u2728\u2728\u2728 \u7372\u5F97 **${lottery}** \u500B\u62BD\u734E\u6A5F\u6703\uFF0C\u50F9\u503C **${(lottery * 500).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}** \u5DF4\u5E63 \u2728\u2728\u2728
+    body += `✨✨✨ 獲得 **${lottery}** 個抽獎機會，價值 **${(lottery * 500).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}** 巴幣 ✨✨✨
 `;
   }
   if (Object.keys(unfinished).length === 0) {
-    body += "\u{1F7E2} \u6240\u6709\u62BD\u734E\u7686\u5DF2\u5B8C\u6210\n";
+    body += "🟢 所有抽獎皆已完成\n";
   }
   Object.keys(unfinished).forEach((key) => {
     if (unfinished[key] === void 0)
       return;
-    body += `\u274C \u672A\u80FD\u81EA\u52D5\u5B8C\u6210\u6240\u6709 ***[${key}](${unfinished[key]})*** \u7684\u62BD\u734E
+    body += `❌ 未能自動完成所有 ***[${key}](${unfinished[key]})*** 的抽獎
 `;
   });
   body += "\n";
