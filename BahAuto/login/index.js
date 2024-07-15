@@ -26,9 +26,12 @@ export default {
           headers: {
             "Content-Type": "application/x-www-form-urlencoded",
             "User-Agent": "Bahadroid (https://www.gamer.com.tw/)",
-            "Cookie": "ckAPP_VCODE=6666",
+            "x-bahamut-app-instanceid": "cc2zQIfDpg4",
             "X-Bahamut-App-Version": "932",
             "X-Bahamut-App-Android": "tw.com.gamer.android.activecenter",
+            "Connection": "Keep-Alive",
+            "accept-encoding": "gzip",
+            "cookie": "ckAPP_VCODE=7045",
           },
         });
 
