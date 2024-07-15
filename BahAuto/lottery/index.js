@@ -78,7 +78,7 @@ var lottery_default = {
             if (await task_page.$eval(
               ".dialogify",
               (elm) => elm.textContent.includes("勇者問答考驗")
-            ).catch(() => { 
+            ).catch(() => {
             })) {
               logger.info(`需要回答問題，正在回答問題`);
               await task_page.$$eval(
