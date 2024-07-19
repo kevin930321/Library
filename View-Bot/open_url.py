@@ -18,9 +18,9 @@ logging.getLogger('WDM').setLevel(logging.CRITICAL)
 
 # Configurable parameters
 num_cycles = 25
-wait_time_in_tab = 60  # seconds
+wait_time_in_tab = 50  # seconds
 sleep_between_cycles = 0  # seconds
-max_tab_execution_time = 50  # maximum time to wait for each tab in seconds
+max_tab_execution_time = 45  # maximum time to wait for each tab in seconds
 
 # Create a directory to store user data directories
 user_data_dir_base = os.path.join(os.getcwd(), 'user_data_dirs')
