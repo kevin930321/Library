@@ -1,6 +1,5 @@
 import { NotFoundError, solve } from "recaptcha-solver";
 import { Pool } from "@jacoblincool/puddle";
-
 var lottery_default = {
   name: "福利社",
   description: "福利社抽獎",
@@ -13,13 +12,6 @@ var lottery_default = {
     let lottery = 0;
     logger.log("正在尋找抽抽樂");
     const draws = await getList(page, logger);
-
-    // 檢查 draws 是否為 undefined
-    if (draws === undefined) {
-      logger.error("getList 函式返回 undefined");
-      return; // 或採取其他適當的錯誤處理措施
-    }
-
     logger.log(`找到 ${draws.length} 個抽抽樂`);
     const unfinished = {};
     draws.forEach(({ name, link }, i) => {
@@ -121,19 +113,20 @@ var lottery_default = {
               await task_page.reload().catch((...args) => logger.error(...args));
               continue;
             } else if (ad_status.includes("觀看廣告")) {
-              // === 跳過廣告的程式碼 ===
-              logger.log("正在嘗試跳過廣告..."); // 新增 log 訊息
-
-              const snValue = page.url().split('sn=')[1]; // 從 URL 中獲取 sn 參數
-              const csrfToken = await getCsrfToken(task_page); // 獲取 CSRF token
-
-              if (snValue && csrfToken) {
-                await sendPostRequest(task_page, csrfToken, snValue); // 發送已看過廣告的 POST 請求
-                await task_page.reload(); // 重新載入頁面，進入結算畫面
-              } else {
-                logger.error("無法跳過廣告，sn 或 CSRF token 獲取失敗");
+              logger.log(`正在觀看廣告`);
+              await task_page.click('button:has-text("確定")');
+              await task_page.waitForSelector("ins iframe").catch((...args) => logger.error(...args));
+              await task_page.waitForTimeout(1e3);
+              const ad_iframe = await task_page.$("ins iframe").catch(
+                (...args) => logger.error(...args)
+              );
+              try {
+                ad_frame = await ad_iframe.contentFrame();
+                await shared.ad_handler({ ad_frame });
+              } catch (err) {
+                logger.error(err);
               }
-              // === 跳過廣告的程式碼結束 ===
+              await task_page.waitForTimeout(1e3);
             } else if (ad_status) {
               logger.log(ad_status);
             }
@@ -175,11 +168,12 @@ var lottery_default = {
     return { lottery, unfinished };
   }
 };
-
 async function getList(page, logger) {
-  let draws = []; // 初始化 draws 為空陣列
+  let draws;
+  await page.context().addCookies([{ name: "ckFuli_18UP", value: "1", domain: "fuli.gamer.com.tw", path: "/" }]);
   let attempts = 3;
   while (attempts-- > 0) {
+    draws = [];
     try {
       await page.goto("https://fuli.gamer.com.tw/shop.php?page=1");
       let items = await page.$$("a.items-card");
@@ -224,12 +218,10 @@ async function getList(page, logger) {
       break;
     } catch (err) {
       logger.error(err);
-      return []; // 發生錯誤時返回空陣列
     }
   }
   return draws;
 }
-
 async function checkInfo(page, logger) {
   try {
     const name = await page.$eval("#name", (elm) => elm.value);
@@ -253,7 +245,6 @@ async function checkInfo(page, logger) {
     logger.error(err);
   }
 }
-
 async function confirm(page, logger, recaptcha) {
   try {
     await page.waitForSelector("input[name='agreeConfirm']", { state: "attached" });
@@ -292,7 +283,6 @@ async function confirm(page, logger, recaptcha) {
     logger.error(err);
   }
 }
-
 function report({ lottery, unfinished }) {
   let body = "# 福利社抽抽樂 \n\n";
   if (lottery) {
@@ -311,45 +301,12 @@ function report({ lottery, unfinished }) {
   body += "\n";
   return body;
 }
-
 function timeout_promise(promise, delay) {
   return new Promise((resolve, reject) => {
     setTimeout(() => reject("Timed Out"), delay);
     promise.then(resolve).catch(reject);
   });
 }
-
-// 獲取 CSRF token
-async function getCsrfToken(page) {
-  try {
-    const response = await page.goto("https://fuli.gamer.com.tw/ajax/getCSRFToken.php?_=1702883537159");
-    const token = await response.text();
-    return token.trim();
-  } catch (error) {
-    console.error('獲取 CSRF token 時發生錯誤:', error);
-    return null;
-  }
-}
-
-// 發送已看完廣告的 POST 請求
-async function sendPostRequest(page, csrfToken, snValue) {
-  try {
-    await page.evaluate((csrfToken, snValue) => {
-      $.ajax({
-        method: "POST",
-        url: "https://fuli.gamer.com.tw/ajax/finish_ad.php",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded"
-        },
-        data: "token=" + encodeURIComponent(csrfToken) + "&area=item&sn=" + encodeURIComponent(snValue)
-      });
-    }, csrfToken, snValue);
-  } catch (error) {
-    console.error('發送 POST 請求時發生錯誤:', error);
-  }
-}
-
-
 export {
   lottery_default as default
 };
