@@ -54,7 +54,9 @@ var lottery_default = {
             }
             logger.log(`[${idx + 1} / ${draws.length}] (${attempts}) ${name}`);
             for (let retried = 1; retried <= CHANGING_RETRY; retried++) {
-              // === 點擊看廣告免費兌換後執行跳過廣告功能 ===
+              await Promise.all([
+                task_page.waitForResponse(/ajax\/check_ad.php/, { timeout: 5e3 }).catch(() => {
+                }),
               await task_page.click("text=看廣告免費兌換").then(async () => {
                 logger.log("正在嘗試跳過廣告...");
                 const snValue = task_page.url().split('sn=')[1];
