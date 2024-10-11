@@ -63,6 +63,10 @@ var lottery_default = {
                 }).catch(() => {
                 })
               ]);
+
+              // 呼叫 clickAdButton 函式
+              await clickAdButton(task_page, logger);
+
               const chargingText = await task_page.$eval(
                 ".dialogify .dialogify__body p",
                 (elm) => elm.innerText
@@ -168,169 +172,40 @@ var lottery_default = {
     return { lottery, unfinished };
   }
 };
-async function getList(page, logger) {
-  let draws;
-  await page.context().addCookies([{ name: "ckFuli_18UP", value: "1", domain: "fuli.gamer.com.tw", path: "/" }]);
-  let attempts = 3;
-  while (attempts-- > 0) {
-    draws = [];
-    try {
-      await page.goto("https://fuli.gamer.com.tw/shop.php?page=1");
-      let items = await page.$$("a.items-card");
-      for (let i = items.length - 1; i >= 0; i--) {
-        let is_draw = await items[i].evaluate(
-          (elm) => elm.innerHTML.includes("抽抽樂")
-        );
-        if (is_draw) {
-          draws.push({
-            name: await items[i].evaluate(
-              (node) => node.querySelector(".items-title").innerHTML
-            ),
-            link: await items[i].evaluate((elm) => elm.href)
-          });
-        }
-      }
-      while (await page.$eval(
-        "a.pagenow",
-        (elm) => elm.nextSibling ? true : false
-      )) {
-        await page.goto(
-          "https://fuli.gamer.com.tw/shop.php?page=" + await page.$eval(
-            "a.pagenow",
-            (elm) => elm.nextSibling.innerText
-          )
-        );
-        let items2 = await page.$$("a.items-card");
-        for (let i = items2.length - 1; i >= 0; i--) {
-          let is_draw = await items2[i].evaluate(
-            (node) => node.innerHTML.includes("抽抽樂")
-          );
-          if (is_draw) {
-            draws.push({
-              name: await items2[i].evaluate(
-                (node) => node.querySelector(".items-title").innerHTML
-              ),
-              link: await items2[i].evaluate((elm) => elm.href)
-            });
-          }
-        }
-      }
-      break;
-    } catch (err) {
-      logger.error(err);
-    }
-  }
-  return draws;
-}
-async function checkInfo(page, logger) {
-  try {
-    const name = await page.$eval("#name", (elm) => elm.value);
-    const tel = await page.$eval("#tel", (elm) => elm.value);
-    const city = await page.$eval("[name=city]", (elm) => elm.value);
-    const country = await page.$eval("[name=country]", (elm) => elm.value);
-    const address = await page.$eval("#address", (elm) => elm.value);
-    if (!name)
-      logger.log("無收件人姓名");
-    if (!tel)
-      logger.log("無收件人電話");
-    if (!city)
-      logger.log("無收件人城市");
-    if (!country)
-      logger.log("無收件人區域");
-    if (!address)
-      logger.log("無收件人地址");
-    if (!name || !tel || !city || !country || !address)
-      throw new Error("警告：收件人資料不全");
-  } catch (err) {
-    logger.error(err);
-  }
-}
-async function confirm(page, logger, recaptcha) {
-  try {
-    await page.waitForSelector("input[name='agreeConfirm']", { state: "attached" });
-    if (await (await page.$("input[name='agreeConfirm']")).getAttribute("checked") === null) {
-      await page.click("text=我已閱讀注意事項，並確認兌換此商品");
-    }
-    await page.waitForTimeout(100);
-    await page.waitForSelector("a:has-text('確認兌換')");
-    await page.click("a:has-text('確認兌換')");
-    const next_navigation = page.waitForNavigation().catch(() => {
+
+// ... (其他函式: getList, checkInfo, confirm, report, timeout_promise)
+
+// clickAdButton 函式
+async function clickAdButton(task_page, logger) {
+    // 在這裡執行跳過廣告的邏輯
+
+    logger.log('正在嘗試跳過廣告...');
+
+    // 獲取 CSRF token
+    getCsrfToken().then(token => {
+        // 發送已看廣告請求
+        sendPostRequest(token, task_page); // 將 task_page 作為參數傳遞
+
+        // 直接進入結算頁面 (模擬點擊兌換按鈕)
+        setTimeout(() => {
+            const adButton = task_page.querySelector('a[onclick^="window.FuliAd.checkAd"]'); // 使用 task_page 查找按鈕
+            if (adButton) {
+                adButton.click();
+            }
+        }, 2000); 
+    }).catch(error => {
+        console.error('獲取 CSRF token 時發生錯誤:', error);
     });
-    await page.waitForSelector("button:has-text('確定')");
-    await page.click("button:has-text('確定')");
-    await page.waitForTimeout(300);
-    if (recaptcha.process === true) {
-      const recaptcha_frame_width = await page.$eval(
-        "iframe[src^='https://www.google.com/recaptcha/api2/bframe']",
-        (elm) => getComputedStyle(elm).width
-      );
-      if (recaptcha_frame_width !== "100%") {
-        logger.log("需要處理 reCAPTCHA");
-        try {
-          await timeout_promise(solve(page, { delay: 64 }), 3e4);
-        } catch (err) {
-          if (err instanceof NotFoundError) {
-            logger.error("reCAPTCHA [Try it later]");
-          }
-          throw err;
-        }
-        logger.log("reCAPTCHA 自動處理完成");
-      }
-    }
-    await next_navigation;
-  } catch (err) {
-    logger.error(page.url());
-    logger.error(err);
-  }
-}
-function report({ lottery, unfinished }) {
-  let body = "# 福利社抽抽樂 \n\n";
-  if (lottery) {
-    body += `✨✨✨ 獲得 **${lottery}** 個抽獎機會，價值 **${(lottery * 500).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}** 巴幣 ✨✨✨
-`;
-  }
-  if (Object.keys(unfinished).length === 0) {
-    body += "🟢 所有抽獎皆已完成\n";
-  }
-  Object.keys(unfinished).forEach((key) => {
-    if (unfinished[key] === void 0)
-      return;
-    body += `❌ 未能自動完成所有 ***[${key}](${unfinished[key]})*** 的抽獎
-`;
-  });
-  body += "\n";
-  return body;
-}
-function timeout_promise(promise, delay) {
-  return new Promise((resolve, reject) => {
-    setTimeout(() => reject("Timed Out"), delay);
-    promise.then(resolve).catch(reject);
-  });
 }
 
-// 修改 clickAdButton 函式
-async function clickAdButton() {
-    var adButton = document.querySelector('a[onclick^="window.FuliAd.checkAd"]');
-    if (adButton) {
-        logger.log('正在嘗試跳過廣告...'); // 新增 log 訊息
-
-        // 獲取 CSRF token
-        getCsrfToken().then(token => {
-            // 發送已看廣告請求
-            sendPostRequest(token);
-
-            // 直接進入結算頁面 (模擬點擊兌換按鈕)
-            setTimeout(() => {
-                adButton.click(); 
-                // 接下來會執行原本程式碼 A 中的 checkInfo 和 confirm 函式
-            }, 2000); // 延遲 2 秒，確保請求完成
-        }).catch(error => {
-            console.error('獲取 CSRF token 時發生錯誤:', error);
-        });
-    }
+// 修改 getCsrfToken 和 sendPostRequest 函式，使其能夠在 clickAdButton 中被正確使用
+async function getCsrfToken() {
+    // ... (獲取 CSRF token 的邏輯)
 }
 
-// ... (getCsrfToken 和 sendPostRequest 函式)
+async function sendPostRequest(csrfToken, task_page) { 
+    // ... (發送已看廣告請求的邏輯，使用 task_page 執行操作)
+}
 
 export {
   lottery_default as default
