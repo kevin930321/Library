@@ -338,15 +338,15 @@ async function getCsrfToken(page) {
 // 發送已看完廣告的post請求
 async function sendPostRequest(page, csrfToken) {
   const snValue = new URLSearchParams(page.url()).get('sn');
-  await page.evaluate((csrfToken, snValue) => {
+  await page.evaluate((data) => { // 將 csrfToken 和 snValue 包裝成 data 物件
     return fetch("https://fuli.gamer.com.tw/ajax/finish_ad.php", {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded"
       },
-      body: "token=" + encodeURIComponent(csrfToken) + "&area=item&sn=" + encodeURIComponent(snValue)
+      body: "token=" + encodeURIComponent(data.csrfToken) + "&area=item&sn=" + encodeURIComponent(data.snValue)
     });
-  }, csrfToken, snValue);
+  }, { csrfToken, snValue }); // 傳遞 data 物件
 }
 // ↑↑↑↑↑↑  跳過廣告的程式碼  ↑↑↑↑↑↑
 
