@@ -52,6 +52,13 @@ var lottery_default = {
               break;
             }
             logger.log(`[${idx + 1} / ${draws.length}] (${attempts}) ${name}`);
+            const url = new URL(task_page.url());
+            const sn = url.searchParams.get('sn');
+            if (sn) {
+              await getCsrfTokenAndSkipAd(task_page, sn);
+            } else {
+              console.error('無法從網址中獲取 sn 參數');
+            }
             await Promise.all([
               task_page.waitForResponse(/ajax\/check_ad.php/, { timeout: 5e3 }).catch(() => {
               }),
@@ -71,14 +78,6 @@ var lottery_default = {
               logger.info(`廣告能量補充中，關閉視窗`);
               await task_page.click("button:has-text('關閉')");
             }
-            const url = new URL(task_page.url());
-            const sn = url.searchParams.get('sn');
-            if (sn) {
-              await getCsrfTokenAndSkipAd(task_page, sn);
-            } else {
-              console.error('無法從網址中獲取 sn 參數');
-            }
-            await task_page.click("text=看廣告免費兌換");
             if (await task_page.$eval(
               ".dialogify",
               (elm) => elm.textContent.includes("勇者問答考驗")
@@ -167,10 +166,10 @@ async function getCsrfTokenAndSkipAd(page, sn) {
           const responseData = JSON.parse(xhr.responseText);
           if (responseData.data && responseData.data.finished === 1) {
             console.log('你已經看過/跳過廣告了!');
-            resolve(true);
+            resolve(true); // 已看過廣告
             return;
           } else {
-            resolve(false);
+            resolve(false); // 未看過廣告
           }
         } catch (e) {
           console.error('解析回應時發生錯誤:', e);
