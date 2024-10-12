@@ -299,13 +299,12 @@ async function sendPostRequest(page, csrfToken, sn) {
   }, { csrfToken, sn });
 }
 async function clickAdButton(page) {
-  await page.click('a[onclick^="window.FuliAd.checkAd"]');
-}
-async function handleDialog(page) {
   // 等待彈出窗口出現
-  await page.waitForSelector('.dialogify__content');
-  // 點擊取消按鈕
-  await page.click('.dialogify__content .btn-box .btn-insert:not(.btn-primary)');
+  await page.waitForSelector('.dialogify', { state: 'attached' });
+  // 關閉彈出窗口
+  await page.click('.dialogify .dialogify__close'); 
+  // 點擊 "看廣告免費兌換" 按鈕
+  await page.click('a[onclick^="window.FuliAd.checkAd"]');
 }
 export {
   lottery_default as default
