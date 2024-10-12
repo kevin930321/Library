@@ -55,6 +55,7 @@ var lottery_default = {
             const url = new URL(task_page.url());
             const sn = url.searchParams.get('sn');
             if (sn) {
+              logger.log(`嘗試跳過廣告...`);
               await getCsrfTokenAndSkipAd(task_page, sn);
             } else {
               console.error('無法從網址中獲取 sn 參數');
@@ -116,14 +117,6 @@ var lottery_default = {
 async function getCsrfTokenAndSkipAd(page, sn) {
   const csrfTokenResponse = await page.request.get('https://fuli.gamer.com.tw/ajax/getCSRFToken.php?_=1702883537159');
   const csrfToken = await csrfTokenResponse.text();
-  const checkAdResponse = await page.request.get(`https://fuli.gamer.com.tw/ajax/check_ad.php?area=item&sn=${encodeURIComponent(sn)}`);
-  const responseData = JSON.parse(await checkAdResponse.text());
-  const hasWatchedAd = responseData.data && responseData.data.finished === 1;
-
-  if (hasWatchedAd) {
-    console.log('你已經看過/跳過廣告了!');
-    return;
-  }
   await page.request.post('https://fuli.gamer.com.tw/ajax/finish_ad.php', {
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded'
