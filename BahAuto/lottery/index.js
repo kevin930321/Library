@@ -330,38 +330,60 @@ async function executeAdSkippingProcess(page, logger) {
 
   // 獲取當前頁面 URL 並列印
   const currentUrl = page.url();
-  logger.log(`兌換頁面 URL: ${currentUrl}`); 
+  logger.debug(`[Debug] 兌換頁面 URL: ${currentUrl}`); 
 
   // 使用正則表達式提取 sn 參數
   const snMatch = currentUrl.match(/sn=(\d+)/); 
   if (snMatch) {
     const snValue = snMatch[1];
-    logger.log(`提取到的 sn 參數: ${snValue}`);
+    logger.debug(`[Debug] 提取到的 sn 參數: ${snValue}`);
 
     // 獲取 CSRF token
+    logger.debug('[Debug] 正在獲取 CSRF token...');
     const csrfToken = await getCsrfToken(page);
+    logger.debug(`[Debug] CSRF token: ${csrfToken}`);
 
     // 模擬點擊 "看廣告免費兌換" 按鈕
+    logger.debug('[Debug] 正在發送 POST 請求...');
     await sendPostRequest(page, csrfToken, snValue); // 將 snValue 傳遞給 sendPostRequest 函數
+    logger.debug('[Debug] POST 請求已發送');
+
+    // 等待頁面跳轉
+    logger.debug('[Debug] 等待頁面跳轉...');
+    await page.waitForNavigation(); 
+    logger.debug(`[Debug] 頁面已跳轉到: ${page.url()}`);
   } else {
-    logger.error('無法從 URL 中提取 sn 參數');
+    logger.error('[Debug] 無法從 URL 中提取 sn 參數');
   }
 }
 
 async function getCsrfToken(page) {
+  logger.debug('[Debug] 正在請求 CSRF token...');
   const response = await page.request.get("https://fuli.gamer.com.tw/ajax/getCSRFToken.php?_=1702883537159");
+  logger.debug('[Debug] CSRF token 請求已發送');
+
   const token = await response.text();
+  logger.debug(`[Debug] CSRF token 響應: ${token}`);
   return token.trim();
 }
 
 async function sendPostRequest(page, csrfToken, snValue) { 
-  await page.request.post("https://fuli.gamer.com.tw/ajax/finish_ad.php", {
+  logger.debug('[Debug] 正在發送 POST 請求...');
+  const response = await page.request.post("https://fuli.gamer.com.tw/ajax/finish_ad.php", {
     data: {
       token: csrfToken,
       area: "item",
       sn: snValue // 使用提取到的 snValue
     }
   });
+  logger.debug('[Debug] POST 請求已發送');
+
+  // 檢查響應狀態碼
+  logger.debug(`[Debug] POST 請求響應狀態碼: ${response.status()}`);
+
+  // 獲取響應內容
+  const responseText = await response.text();
+  logger.debug(`[Debug] POST 請求響應內容: ${responseText}`); 
 }
 // --- 跳過廣告函式結束 ---
 
