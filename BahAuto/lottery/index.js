@@ -56,20 +56,30 @@ var lottery_default = {
             const sn = url.searchParams.get('sn');
             if (sn) {
               logger.log(`嘗試跳過廣告...`);
-              await Promise.all([
-                task_page.waitForResponse(/ajax\/check_ad.php/, { timeout: 5e3 }).catch(() => {}),
-                task_page.click("text=看廣告免費兌換").catch(() => {}),
-                task_page.waitForSelector(".fuli-ad__qrcode", { timeout: 5e3 }).catch(() => {})
-              ]);
-              await getCsrfTokenAndSkipAd(task_page, sn);
-              
-              const chargingText = await task_page.$eval(".dialogify .dialogify__body p", (elm) => elm.innerText).catch(() => {}) || "";
-              if (chargingText.includes("廣告能量補充中")) {
-                logger.info(`廣告能量補充中，關閉視窗`);
-                await task_page.click("button:has-text('關閉')");
+
+              // 檢查是否已經看過或跳過廣告
+              const checkAdResponse = await task_page.request.get(`https://fuli.gamer.com.tw/ajax/check_ad.php?area=item&sn=${encodeURIComponent(sn)}`);
+              const checkAdData = JSON.parse(await checkAdResponse.text());
+
+              if (checkAdData.data && checkAdData.data.finished === 1) {
+                logger.log(`已看過或跳過廣告，直接執行後續流程`);
+                await task_page.click("text=看廣告免費兌換").catch(() => {}); // 模擬點擊，觸發後續流程
+              } else {
+                // 尚未看過或跳過廣告，執行跳過廣告的邏輯
+                await Promise.all([
+                  task_page.waitForResponse(/ajax\/check_ad.php/, { timeout: 5e3 }).catch(() => {}),
+                  task_page.click("text=看廣告免費兌換").catch(() => {}),
+                  task_page.waitForSelector(".fuli-ad__qrcode", { timeout: 5e3 }).catch(() => {})
+                ]);
+                await getCsrfTokenAndSkipAd(task_page, sn);
+
+                const chargingText = await task_page.$eval(".dialogify .dialogify__body p", (elm) => elm.innerText).catch(() => {}) || "";
+                if (chargingText.includes("廣告能量補充中")) {
+                  logger.info(`廣告能量補充中，關閉視窗`);
+                  await task_page.click("button:has-text('關閉')");
+                }
               }
-            }
-            else {
+            } else {
               console.error('無法從網址中獲取 sn 參數');
             }
             if (await task_page.$eval(".dialogify", (elm) => elm.textContent.includes("勇者問答考驗")).catch(() => {})) {
