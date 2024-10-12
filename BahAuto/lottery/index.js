@@ -21,7 +21,6 @@ var lottery_default = {
     });
     const PARRALLEL = +params.max_parallel || 1;
     const MAX_ATTEMPTS = +params.max_attempts || +shared.max_attempts || 20;
-    const CHANGING_RETRY = +params.changing_retry || +shared.changing_retry || 3;
     const context = page.context();
     const pool = new Pool(PARRALLEL);
     for (let i = 0; i < draws.length; i++) {
@@ -53,23 +52,11 @@ var lottery_default = {
               break;
             }
             logger.log(`[${idx + 1} / ${draws.length}] (${attempts}) ${name}`);
-            for (let retried = 1; retried <= CHANGING_RETRY; retried++) {
-              await Promise.all([
-                task_page.waitForResponse(/ajax\/check_ad.php/, { timeout: 5e3 }).catch(() => { }),
-                task_page.click("text=看廣告免費兌換").catch(() => { }),
-                task_page.waitForSelector(".fuli-ad__qrcode", { timeout: 5e3 }).catch(() => { })
-              ]);
-              const chargingText = await task_page.$eval(
-                ".dialogify .dialogify__body p",
-                (elm) => elm.innerText
-              ).catch(() => { }) || "";
-              if (chargingText.includes("廣告能量補充中")) {
-                logger.info(`廣告能量補充中，重試 (${retried}/${CHANGING_RETRY})`);
-                await task_page.click("button:has-text('關閉')");
-                continue;
-              }
-              break;
-            }
+            await Promise.all([
+              task_page.waitForResponse(/ajax\/check_ad.php/, { timeout: 5e3 }).catch(() => { }),
+              task_page.click("text=看廣告免費兌換").catch(() => { }),
+              task_page.waitForSelector(".fuli-ad__qrcode", { timeout: 5e3 }).catch(() => { })
+            ]);            
             await skipAd(task_page, logger);
             if (await task_page.$eval(
               ".dialogify",
