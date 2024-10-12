@@ -328,27 +328,33 @@ function timeout_promise(promise, delay) {
 // --- 跳過廣告函式 ---
 async function executeAdSkippingProcess(page, logger) {
 
-  // 獲取當前頁面 URL
+  // 獲取當前頁面 URL 並列印
   const currentUrl = page.url();
+  logger.log(`兌換頁面 URL: ${currentUrl}`); 
 
-  // 使用 URLSearchParams 提取 sn 參數
-  const urlParams = new URLSearchParams(currentUrl);
-  const snValue = urlParams.get('sn');
+  // 使用正則表達式提取 sn 參數
+  const snMatch = currentUrl.match(/sn=(\d+)/); 
+  if (snMatch) {
+    const snValue = snMatch[1];
+    logger.log(`提取到的 sn 參數: ${snValue}`);
 
-  if (!snValue) {
-    logger.error('無法獲取 sn 參數');
-    return;
+    // 獲取 CSRF token
+    const csrfToken = await getCsrfToken(page);
+
+    // 模擬點擊 "看廣告免費兌換" 按鈕
+    await sendPostRequest(page, csrfToken, snValue); // 將 snValue 傳遞給 sendPostRequest 函數
+  } else {
+    logger.error('無法從 URL 中提取 sn 參數');
   }
+}
 
-  // 獲取 CSRF token
-  const csrfToken = await getCsrfToken(page);
-
-  // 模擬點擊 "看廣告免費兌換" 按鈕
-  await sendPostRequest(page, csrfToken, snValue); // 將 snValue 傳遞給 sendPostRequest 函數
+async function getCsrfToken(page) {
+  const response = await page.request.get("https://fuli.gamer.com.tw/ajax/getCSRFToken.php?_=1702883537159");
+  const token = await response.text();
+  return token.trim();
 }
 
 async function sendPostRequest(page, csrfToken, snValue) { 
-  // ... 使用 snValue 的程式碼 ...
   await page.request.post("https://fuli.gamer.com.tw/ajax/finish_ad.php", {
     data: {
       token: csrfToken,
@@ -357,7 +363,6 @@ async function sendPostRequest(page, csrfToken, snValue) {
     }
   });
 }
-
 // --- 跳過廣告函式結束 ---
 
 export {
