@@ -77,10 +77,10 @@ var lottery_default = {
               task_page.waitForSelector(".fuli-ad__qrcode", { timeout: 5e3 }).catch(() => {})
             ]);
             const chargingText = await task_page.$eval(".dialogify .dialogify__body p", (elm) => elm.innerText).catch(() => {}) || "";
-            if (chargingText.includes("廣告能量補充中")) {
-              logger.info(`廣告能量補充中，關閉視窗`);
-              await task_page.click("button:has-text('關閉')");
-            }
+            // if (chargingText.includes("廣告能量補充中")) {
+              // logger.info(`廣告能量補充中，關閉視窗`);
+              // await task_page.click("button:has-text('關閉')");
+            // }
             if (await task_page.$eval(".dialogify", (elm) => elm.textContent.includes("勇者問答考驗")).catch(() => {})) {
               logger.info(`需要回答問題，正在回答問題`);
               await task_page.$$eval("#dialogify_1 .dialogify__body a", (options) => {
