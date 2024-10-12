@@ -272,15 +272,17 @@ async function skipAd(page, logger) {
     return;
   }
   const csrfToken = await getCSRFToken(page);
-  // 發送已看完廣告的 POST 請求
   await sendPostRequest(page, csrfToken, sn);
-  // 點擊 "看廣告免費兌換" 按鈕
   await page.click("text=看廣告免費兌換").catch(() => { });
-  // 等待彈出窗口出現
-  await page.waitForSelector('.dialogify__content');
-  // 點擊取消按鈕
-  await page.click('.dialogify__content .btn-box .btn-insert:not(.btn-primary)');
-  logger.log("已跳過廣告");
+  const dialog = await page.waitForSelector('.dialogify__content', { timeout: 60000 }).catch(() => null); 
+  // 檢查彈出窗口是否出現
+  if (dialog) {
+    // 點擊取消按鈕
+    await page.click('.dialogify__content .btn-box .btn-insert:not(.btn-primary)');
+    logger.log("已跳過廣告");
+  } else {
+    logger.log("沒有彈出窗口，可能已經看過廣告或不需要看廣告");
+  }
 }
 async function getCSRFToken(page) {
   const response = await page.evaluate(async () => {
