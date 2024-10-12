@@ -1,5 +1,6 @@
 import { NotFoundError, solve } from "recaptcha-solver";
 import { Pool } from "@jacoblincool/puddle";
+
 var lottery_default = {
   name: "福利社",
   description: "福利社抽獎",
@@ -113,20 +114,29 @@ var lottery_default = {
               await task_page.reload().catch((...args) => logger.error(...args));
               continue;
             } else if (ad_status.includes("觀看廣告")) {
-              logger.log(`正在觀看廣告`);
+              logger.log(`正在跳過廣告`);
+
+              // 模擬點擊 "看廣告免費兌換" 按鈕
+              await task_page.click('a[onclick^="window.FuliAd.checkAd"]');
+
+              // 獲取 sn 參數
+              const urlParams = new URLSearchParams(task_page.url());
+              const snValue = urlParams.get('sn');
+
+              // 获取 CSRF token
+              const csrfTokenResponse = await task_page.request.get('https://fuli.gamer.com.tw/ajax/getCSRFToken.php?_=1702883537159');
+              const csrfToken = await csrfTokenResponse.text();
+
+              // 發送已看完廣告的 POST 請求
+              await task_page.request.post('https://fuli.gamer.com.tw/ajax/finish_ad.php', {
+                headers: {
+                  'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                data: `token=${encodeURIComponent(csrfToken)}&area=item&sn=${encodeURIComponent(snValue)}`,
+              });
+
+              // 模擬點擊 "確定" 按鈕
               await task_page.click('button:has-text("確定")');
-              await task_page.waitForSelector("ins iframe").catch((...args) => logger.error(...args));
-              await task_page.waitForTimeout(1e3);
-              const ad_iframe = await task_page.$("ins iframe").catch(
-                (...args) => logger.error(...args)
-              );
-              try {
-                ad_frame = await ad_iframe.contentFrame();
-                await shared.ad_handler({ ad_frame });
-              } catch (err) {
-                logger.error(err);
-              }
-              await task_page.waitForTimeout(1e3);
             } else if (ad_status) {
               logger.log(ad_status);
             }
