@@ -55,6 +55,7 @@ var lottery_default = {
 
             await task_page.click("text=看廣告免費兌換");
             await task_page.waitForSelector(".dialogify", { timeout: 5000 });
+            logger.info(`[${name}] 正在嘗試跳過廣告...`);
 
             const dialog = await task_page.$(".dialogify");
             const chargingText = await dialog.$eval(".dialogify__body p", (elm) => elm.innerText).catch(() => "");
