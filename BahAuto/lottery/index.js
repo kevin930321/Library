@@ -9,7 +9,7 @@ var lottery_default = {
       throw new Error("使用者未登入，無法抽獎");
     if (!shared.ad_handler)
       throw new Error("需使用 ad_handler 模組");
-    logger.log("開始執行");
+    logger.log(`開始執行`);
     let lottery = 0;
     logger.log("正在尋找抽抽樂");
     const draws = await getList(page, logger);
@@ -52,34 +52,57 @@ var lottery_default = {
               break;
             }
             logger.log(`[${idx + 1} / ${draws.length}] (${attempts}) ${name}`);
-            
             await Promise.all([
-              task_page.waitForResponse(/ajax\/check_ad.php/, { timeout: 5e3 }).catch(() => { }),
-              task_page.click("text=看廣告免費兌換").catch(() => { }),
-              task_page.waitForSelector(".fuli-ad__qrcode", { timeout: 5e3 }).catch(() => { })
+              task_page.waitForResponse(/ajax\/check_ad.php/, { timeout: 5e3 }).catch(() => {
+              }),
+              task_page.click("text=看廣告免費兌換").catch(() => {
+              }),
+              task_page.waitForSelector(".fuli-ad__qrcode", {
+                timeout: 5e3
+              }).catch(() => {
+              })
             ]);
-            logger.info(`[${name}] 正在嘗試跳過廣告...`);
-
+            const chargingText = await task_page.$eval(
+              ".dialogify .dialogify__body p",
+              (elm) => elm.innerText
+            ).catch(() => {
+            }) || "";
             if (chargingText.includes("廣告能量補充中")) {
-              logger.info("廣告能量補充中，執行跳過");
-              await dialog.$eval("button:has-text('關閉')", (button) => button.click());
-              await getCsrfToken(task_page).then(async (token) => {
-                await sendPostRequest(task_page, token); 
-                await task_page.waitForTimeout(2000);
-              }).catch((error) => {
-                logger.error('獲取 CSRF token 時發生錯誤:', error);
-              });
+              logger.info(`廣告能量補充中，關閉視窗`);
+              await task_page.click("button:has-text('關閉')");
+            }
+            const url = new URL(task_page.url());
+            const sn = url.searchParams.get('sn');
+            if (sn) {
+              await getCsrfTokenAndSkipAd(task_page, sn);
             } else {
-              await getCsrfToken(task_page).then(async (token) => {
-                await sendPostRequest(task_page, token);
-                await task_page.waitForTimeout(2000);
-              }).catch((error) => {
-                logger.error('獲取 CSRF token 時發生錯誤:', error);
-              });
+              console.error('無法從網址中獲取 sn 參數');
+            }
+            await task_page.click("text=看廣告免費兌換");
+            if (await task_page.$eval(
+              ".dialogify",
+              (elm) => elm.textContent.includes("勇者問答考驗")
+            ).catch(() => {
+            })) {
+              logger.info(`需要回答問題，正在回答問題`);
+              await task_page.$$eval(
+                "#dialogify_1 .dialogify__body a",
+                (options) => {
+                  options.forEach(
+                    (option) => {
+                      if (option.dataset.option == option.dataset.answer)
+                        option.click();
+                    }
+                  );
+                }
+              );
+              await task_page.waitForSelector("#btn-buy");
+              await task_page.waitForTimeout(100);
+              await task_page.click("#btn-buy");
             }
             const final_url = task_page.url();
             if (final_url.includes("/buyD.php") && final_url.includes("ad=1")) {
-              logger.log("正在確認結算頁面");
+              logger.log(`正在確認結算頁面`);
               await checkInfo(task_page, logger).catch(
                 (...args) => logger.error(...args)
               );
@@ -108,37 +131,78 @@ var lottery_default = {
     }
     await pool.go();
     await page.waitForTimeout(2e3);
-    logger.log("執行完畢 ✨");
+    logger.log(`執行完畢 ✨`);
     if (shared.report) {
       shared.report.reports["福利社抽獎"] = report({ lottery, unfinished });
     }
     return { lottery, unfinished };
   }
 };
-async function getCsrfToken(page) {
-  const response = await page.evaluate(() => {
-    return fetch("https://fuli.gamer.com.tw/ajax/getCSRFToken.php?_=1702883537159")
-      .then(res => res.text());
+async function getCsrfTokenAndSkipAd(page, sn) {
+  const csrfTokenResponse = await page.evaluate(() => {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', 'https://fuli.gamer.com.tw/ajax/getCSRFToken.php?_=1702883537159');
+      xhr.onload = () => {
+        const token = xhr.responseText.trim();
+        if (token) {
+          resolve(token);
+        } else {
+          reject('Token not found in response');
+        }
+      };
+      xhr.onerror = (error) => {
+        reject('Error during request: ' + error.message);
+      };
+      xhr.send();
+    });
   });
-  return response.trim();
-}
+  const csrfToken = csrfTokenResponse;
+  const hasWatchedAd = await page.evaluate((sn) => {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', `https://fuli.gamer.com.tw/ajax/check_ad.php?area=item&sn=${encodeURIComponent(sn)}`);
+      xhr.onload = () => {
+        try {
+          const responseData = JSON.parse(xhr.responseText);
+          if (responseData.data && responseData.data.finished === 1) {
+            console.log('你已經看過/跳過廣告了!');
+            resolve(true);
+            return;
+          } else {
+            resolve(false);
+          }
+        } catch (e) {
+          console.error('解析回應時發生錯誤:', e);
+          reject(e);
+        }
+      };
+      xhr.onerror = (error) => {
+        reject('Error during request: ' + error.message);
+      };
+      xhr.send();
+    });
+  }, sn);
 
-async function sendPostRequest(page, csrfToken) {
-  const urlParams = new URLSearchParams(page.url());
-  const snValue = urlParams.get('sn');
-  if (!snValue) {
-    console.log('無法獲取sn參數');
+  if (hasWatchedAd) {
+    console.log('已跳過廣告，無需再次操作');
     return;
   }
-  await page.evaluate((csrfToken, snValue) => {
-    return fetch("https://fuli.gamer.com.tw/ajax/finish_ad.php", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded"
-      },
-      body: "token=" + encodeURIComponent(csrfToken) + "&area=item&sn=" + encodeURIComponent(snValue)
-    }).then(res => res.text());
-  }, csrfToken, snValue);
+  await page.evaluate((csrfToken, sn) => {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', 'https://fuli.gamer.com.tw/ajax/finish_ad.php');
+      xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+      xhr.onload = () => {
+        console.log('post回應:', xhr.responseText);
+        resolve();
+      };
+      xhr.onerror = (error) => {
+        reject('Error during request: ' + error.message);
+      };
+      xhr.send(`token=${encodeURIComponent(csrfToken)}&area=item&sn=${encodeURIComponent(sn)}`);
+    });
+  }, csrfToken, sn);
 }
 async function getList(page, logger) {
   let draws;
@@ -258,7 +322,8 @@ async function confirm(page, logger, recaptcha) {
 function report({ lottery, unfinished }) {
   let body = "# 福利社抽抽樂 \n\n";
   if (lottery) {
-    body += `✨✨✨ 獲得 **${lottery}** 個抽獎機會，價值 **${(lottery * 500).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}** 巴幣 ✨✨✨\n`;
+    body += `✨✨✨ 獲得 **${lottery}** 個抽獎機會，價值 **${(lottery * 500).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}** 巴幣 ✨✨✨
+`;
   }
   if (Object.keys(unfinished).length === 0) {
     body += "🟢 所有抽獎皆已完成\n";
@@ -266,7 +331,8 @@ function report({ lottery, unfinished }) {
   Object.keys(unfinished).forEach((key) => {
     if (unfinished[key] === void 0)
       return;
-    body += `❌ 未能自動完成所有 ***[${key}](${unfinished[key]})*** 的抽獎\n`;
+    body += `❌ 未能自動完成所有 ***[${key}](${unfinished[key]})*** 的抽獎
+`;
   });
   body += "\n";
   return body;
