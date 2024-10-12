@@ -52,8 +52,12 @@ var lottery_default = {
               break;
             }
             logger.log(`[${idx + 1} / ${draws.length}] (${attempts}) ${name}`);
-
-            await task_page.click("text=看廣告免費兌換");
+            
+            await Promise.all([
+              task_page.waitForResponse(/ajax\/check_ad.php/, { timeout: 5e3 }).catch(() => { }),
+              task_page.click("text=看廣告免費兌換").catch(() => { }),
+              task_page.waitForSelector(".fuli-ad__qrcode", { timeout: 5e3 }).catch(() => { })
+            ]);
             await task_page.waitForSelector(".dialogify", { timeout: 5000 });
             logger.info(`[${name}] 正在嘗試跳過廣告...`);
 
