@@ -56,13 +56,24 @@ var lottery_default = {
             const sn = url.searchParams.get('sn');
             if (sn) {
               logger.log(`嘗試跳過廣告...`);
+              
+              // --- 修改部分：新增點擊 "看廣告免費兌換" 和處理彈出視窗 ---
+              await task_page.click("text=看廣告免費兌換");
+              
+              // 使用 waitForSelector 或其他方式等待彈出視窗出現
+              await task_page.waitForSelector(".dialogify"); 
+              
+              // 模擬點擊關閉按鈕
+              await task_page.click(".dialogify button:has-text('關閉')"); 
+              // --- 修改部分結束 ---
+              
               await getCsrfTokenAndSkipAd(task_page, sn);
             } else {
               console.error('無法從網址中獲取 sn 參數');
             }
             await Promise.all([
               task_page.waitForResponse(/ajax\/check_ad.php/, { timeout: 5e3 }).catch(() => {}),
-              task_page.click("text=看廣告免費兌換").catch(() => {}),
+              // task_page.click("text=看廣告免費兌換").catch(() => {}), // 移除此行，因為已經在前面點擊過了
               task_page.waitForSelector(".fuli-ad__qrcode", { timeout: 5e3 }).catch(() => {})
             ]);
             const chargingText = await task_page.$eval(".dialogify .dialogify__body p", (elm) => elm.innerText).catch(() => {}) || "";
@@ -114,6 +125,7 @@ var lottery_default = {
     return { lottery, unfinished };
   }
 };
+
 async function getCsrfTokenAndSkipAd(page, sn) {
   const csrfTokenResponse = await page.request.get('https://fuli.gamer.com.tw/ajax/getCSRFToken.php?_=1702883537159');
   const csrfToken = await csrfTokenResponse.text();
