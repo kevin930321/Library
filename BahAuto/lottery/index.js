@@ -265,6 +265,7 @@ function timeout_promise(promise, delay) {
   });
 }
 async function skipAd(page, logger) {
+  logger.log("正在嘗試跳過廣告...");
   const sn = new URL(page.url()).searchParams.get('sn');
   if (!sn) {
     logger.error("無法獲取 sn 參數");
@@ -277,7 +278,6 @@ async function skipAd(page, logger) {
   await clickAdButton(page);
   // 處理彈出窗口 
   await handleDialog(page);
-
   logger.log("已跳過廣告");
 }
 async function getCSRFToken(page) {
