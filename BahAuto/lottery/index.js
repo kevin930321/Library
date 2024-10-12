@@ -276,8 +276,10 @@ async function skipAd(page, logger) {
   await sendPostRequest(page, csrfToken, sn);
   // 點擊 "看廣告免費兌換" 按鈕
   await page.click("text=看廣告免費兌換").catch(() => { });
-  // 處理彈出窗口 
-  await handleDialog(page);
+  // 等待彈出窗口出現
+  await page.waitForSelector('.dialogify__content');
+  // 點擊取消按鈕
+  await page.click('.dialogify__content .btn-box .btn-insert:not(.btn-primary)');
   logger.log("已跳過廣告");
 }
 async function getCSRFToken(page) {
