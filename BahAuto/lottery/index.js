@@ -58,14 +58,13 @@ var lottery_default = {
               logger.log(`嘗試跳過廣告...`);
               await Promise.all([
                 task_page.waitForResponse(/ajax\/check_ad.php/, { timeout: 5e3 }).catch(() => {}),
-                task_page.click("text=看廣告免費兌換").catch(() => {}), // 使用原本的點擊方式
+                task_page.click("text=看廣告免費兌換").catch(() => {}),
                 task_page.waitForSelector(".fuli-ad__qrcode", { timeout: 5e3 }).catch(() => {})
               ]);
-
               await getCsrfTokenAndSkipAd(task_page, sn);
               
               const chargingText = await task_page.$eval(".dialogify .dialogify__body p", (elm) => elm.innerText).catch(() => {}) || "";
-              if (chargingText.includes("廣告能量補充中")) { // 使用原本的關閉彈出視窗方式
+              if (chargingText.includes("廣告能量補充中")) {
                 logger.info(`廣告能量補充中，關閉視窗`);
                 await task_page.click("button:has-text('關閉')");
               }
@@ -73,7 +72,6 @@ var lottery_default = {
             else {
               console.error('無法從網址中獲取 sn 參數');
             }
-
             if (await task_page.$eval(".dialogify", (elm) => elm.textContent.includes("勇者問答考驗")).catch(() => {})) {
               logger.info(`需要回答問題，正在回答問題`);
               await task_page.$$eval("#dialogify_1 .dialogify__body a", (options) => {
@@ -118,7 +116,6 @@ var lottery_default = {
     return { lottery, unfinished };
   }
 };
-
 async function getCsrfTokenAndSkipAd(page, sn) {
   const csrfTokenResponse = await page.request.get('https://fuli.gamer.com.tw/ajax/getCSRFToken.php?_=1702883537159');
   const csrfToken = await csrfTokenResponse.text();
