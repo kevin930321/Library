@@ -288,15 +288,15 @@ async function getCSRFToken(page) {
   return response.trim();
 }
 async function sendPostRequest(page, csrfToken, sn) {
-  await page.evaluate(async (csrfToken, sn) => {
+  await page.evaluate(async (params) => {
     await fetch("https://fuli.gamer.com.tw/ajax/finish_ad.php", {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded"
       },
-      body: `token=${encodeURIComponent(csrfToken)}&area=item&sn=${encodeURIComponent(sn)}`
+      body: `token=${encodeURIComponent(params.csrfToken)}&area=item&sn=${encodeURIComponent(params.sn)}` 
     });
-  }, csrfToken, sn);
+  }, { csrfToken, sn });
 }
 async function clickAdButton(page) {
   await page.click('a[onclick^="window.FuliAd.checkAd"]');
