@@ -340,7 +340,7 @@ async function executeAdSkippingProcess(page, logger) {
 
     // 獲取 CSRF token
     logger.debug('[Debug] 正在獲取 CSRF token...');
-    const csrfToken = await getCsrfToken(page);
+    const csrfToken = await getCsrfToken(page, logger); // 將 logger 作為參數傳遞給 getCsrfToken
     logger.debug(`[Debug] CSRF token: ${csrfToken}`);
 
     // 模擬點擊 "看廣告免費兌換" 按鈕
@@ -357,7 +357,7 @@ async function executeAdSkippingProcess(page, logger) {
   }
 }
 
-async function getCsrfToken(page) {
+async function getCsrfToken(page, logger) { // 添加 logger 參數
   logger.debug('[Debug] 正在請求 CSRF token...');
   const response = await page.request.get("https://fuli.gamer.com.tw/ajax/getCSRFToken.php?_=1702883537159");
   logger.debug('[Debug] CSRF token 請求已發送');
