@@ -58,11 +58,7 @@ var lottery_default = {
               task_page.click("text=看廣告免費兌換").catch(() => { }),
               task_page.waitForSelector(".fuli-ad__qrcode", { timeout: 5e3 }).catch(() => { })
             ]);
-            await task_page.waitForSelector(".dialogify", { timeout: 5000 });
             logger.info(`[${name}] 正在嘗試跳過廣告...`);
-
-            const dialog = await task_page.$(".dialogify");
-            const chargingText = await dialog.$eval(".dialogify__body p", (elm) => elm.innerText).catch(() => "");
 
             if (chargingText.includes("廣告能量補充中")) {
               logger.info("廣告能量補充中，執行跳過");
