@@ -275,7 +275,7 @@ async function skipAd(page, logger) {
   // 發送已看完廣告的 POST 請求
   await sendPostRequest(page, csrfToken, sn);
   // 點擊 "看廣告免費兌換" 按鈕
-  await clickAdButton(page);
+  await page.click("text=看廣告免費兌換").catch(() => { });
   // 處理彈出窗口 
   await handleDialog(page);
   logger.log("已跳過廣告");
@@ -297,14 +297,6 @@ async function sendPostRequest(page, csrfToken, sn) {
       body: `token=${encodeURIComponent(params.csrfToken)}&area=item&sn=${encodeURIComponent(params.sn)}` 
     });
   }, { csrfToken, sn });
-}
-async function clickAdButton(page) {
-  // 等待彈出窗口出現
-  await page.waitForSelector('.dialogify', { state: 'attached' });
-  // 關閉彈出窗口
-  await page.click('.dialogify .dialogify__close'); 
-  // 點擊 "看廣告免費兌換" 按鈕
-  await page.click('a[onclick^="window.FuliAd.checkAd"]');
 }
 export {
   lottery_default as default
