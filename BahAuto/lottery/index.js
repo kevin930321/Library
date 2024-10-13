@@ -55,7 +55,7 @@ await task_page.waitForTimeout(100);
         }
         logger.log(`[${idx + 1} / ${draws.length}] (${attempts}) ${name}`);
 
-  // --- 跳過廣告流程 ---
+        // --- 跳過廣告流程 ---
         logger.log(`正在跳過廣告: ${name}`); 
         await executeAdSkippingProcess(task_page, logger);
         // --- 跳過廣告流程結束 ---
