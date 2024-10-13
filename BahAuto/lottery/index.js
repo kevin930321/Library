@@ -338,44 +338,32 @@ async function executeAdSkippingProcess(page, logger) {
     const snValue = snMatch[1];
     logger.debug(`[Debug] 提取到的 sn 參數: ${snValue}`);
 
-    // 獲取 CSRF token
-    logger.debug('[Debug] 正在獲取 CSRF token...');
-    const csrfToken = await getCsrfToken(page, logger); // 將 logger 作為參數傳遞給 getCsrfToken
-    logger.debug(`[Debug] CSRF token: ${csrfToken}`);
-
-    // 模擬點擊 "看廣告免費兌換" 按鈕
-    logger.debug('[Debug] 正在發送 POST 請求...');
-    await sendPostRequest(page, csrfToken, snValue, logger); // 將 logger 作為參數傳遞給 sendPostRequest
-    logger.debug('[Debug] POST 請求已發送');
-
-    // 等待頁面跳轉
-    logger.debug('[Debug] 等待頁面跳轉...');
-    await page.waitForNavigation(); 
-    logger.debug(`[Debug] 頁面已跳轉到: ${page.url()}`);
+  const adButton = await page.$("text=看廣告免費兌換");
+  if (adButton) {
+    await adButton.click();
   } else {
-    logger.error('[Debug] 無法從 URL 中提取 sn 參數');
+    logger.error("找不到 '看廣告免費兌換' 按鈕");
+    return; // 或其他錯誤處理邏輯
   }
-}
 
-async function getCsrfToken(page, logger) { // 添加 logger 參數
-  logger.debug('[Debug] 正在請求 CSRF token...');
-  const response = await page.request.get("https://fuli.gamer.com.tw/ajax/getCSRFToken.php?_=1702883537159");
-  logger.debug('[Debug] CSRF token 請求已發送');
+  // 獲取 CSRF token (移到點擊按鈕之後)
+  logger.debug('[Debug] 正在獲取 CSRF token...');
+  const csrfToken = await getCsrfToken(page, logger);
+  logger.debug(`[Debug] CSRF token: ${csrfToken}`);
 
-  const token = await response.text();
-  logger.debug(`[Debug] CSRF token 響應: ${token}`);
-  return token.trim();
-}
 
-async function sendPostRequest(page, csrfToken, snValue, logger) { // 添加 logger 參數
+  // 模擬點擊 "看廣告免費兌換" 按鈕
   logger.debug('[Debug] 正在發送 POST 請求...');
+
+   // 使用 application/x-www-form-urlencoded 格式發送 POST 請求
   const response = await page.request.post("https://fuli.gamer.com.tw/ajax/finish_ad.php", {
-    data: {
-      token: csrfToken,
-      area: "item",
-      sn: snValue // 使用提取到的 snValue
-    }
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: `token=${encodeURIComponent(csrfToken)}&area=item&sn=${encodeURIComponent(snValue)}`
   });
+
+
   logger.debug('[Debug] POST 請求已發送');
 
   // 檢查響應狀態碼
@@ -383,7 +371,7 @@ async function sendPostRequest(page, csrfToken, snValue, logger) { // 添加 log
 
   // 獲取響應內容
   const responseText = await response.text();
-  logger.debug(`[Debug] POST 請求響應內容: ${responseText}`); 
+  logger.debug(`[Debug] POST 請求響應內容: ${responseText}`);
 }
 // --- 跳過廣告函式結束 ---
 
