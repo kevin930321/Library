@@ -345,7 +345,7 @@ async function executeAdSkippingProcess(page, logger) {
 
     // 模擬點擊 "看廣告免費兌換" 按鈕
     logger.debug('[Debug] 正在發送 POST 請求...');
-    await sendPostRequest(page, csrfToken, snValue); // 將 snValue 傳遞給 sendPostRequest 函數
+    await sendPostRequest(page, csrfToken, snValue, logger); // 將 logger 作為參數傳遞給 sendPostRequest
     logger.debug('[Debug] POST 請求已發送');
 
     // 等待頁面跳轉
@@ -367,7 +367,7 @@ async function getCsrfToken(page, logger) { // 添加 logger 參數
   return token.trim();
 }
 
-async function sendPostRequest(page, csrfToken, snValue) { 
+async function sendPostRequest(page, csrfToken, snValue, logger) { // 添加 logger 參數
   logger.debug('[Debug] 正在發送 POST 請求...');
   const response = await page.request.post("https://fuli.gamer.com.tw/ajax/finish_ad.php", {
     data: {
