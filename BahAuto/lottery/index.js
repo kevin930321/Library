@@ -48,6 +48,11 @@ await task_page.goto(link);
 await task_page.waitForSelector("#BH-master > .BH-lbox.fuli-pbox h1");
 await task_page.waitForTimeout(100);
 
+        // --- 跳過廣告流程 ---
+        logger.log(`正在跳過廣告: ${name}`); 
+        await executeAdSkippingProcess(task_page, logger);
+        // --- 跳過廣告流程結束 ---
+
         if (await task_page.$(".btn-base.c-accent-o.is-disable")) {
           logger.log(`${name} 的廣告免費次數已用完 \u001b[92m✔\u001b[m`);
           delete unfinished[name];
@@ -55,16 +60,15 @@ await task_page.waitForTimeout(100);
         }
         logger.log(`[${idx + 1} / ${draws.length}] (${attempts}) ${name}`);
 
-        // --- 跳過廣告流程 ---
-        logger.log(`正在跳過廣告: ${name}`); 
-        await executeAdSkippingProcess(task_page, logger);
-        // --- 跳過廣告流程結束 ---
-
         // --- 檢查是否需要回答問題，並點擊 "看廣告免費兌換" ---
         await Promise.all([
           task_page.waitForResponse(/ajax\/check_ad.php/, { timeout: 5e3 }).catch(() => {
           }),
           task_page.click("text=看廣告免費兌換").catch(() => {
+          }),
+          task_page.waitForSelector(".fuli-ad__qrcode", {
+            timeout: 5e3
+          }).catch(() => {
           })
         ]);
 
@@ -335,47 +339,30 @@ if (snMatch) {
 const snValue = snMatch[1];
 logger.debug([Debug] 提取到的 sn 參數: ${snValue});
 
-// 獲取 CSRF token
+const adButton = await page.$("text=看廣告免費兌換");
+if (adButton) {
+await adButton.click();
+} else {
+logger.error("找不到 '看廣告免費兌換' 按鈕");
+return; // 或其他錯誤處理邏輯
+}
+
+// 獲取 CSRF token (移到點擊按鈕之後)
 logger.debug('[Debug] 正在獲取 CSRF token...');
-const csrfToken = await getCsrfToken(page, logger); // 將 logger 作為參數傳遞給 getCsrfToken
-logger.debug(`[Debug] CSRF token: ${csrfToken}`);
+const csrfToken = await getCsrfToken(page, logger);
+logger.debug([Debug] CSRF token: ${csrfToken});
 
 // 模擬點擊 "看廣告免費兌換" 按鈕
 logger.debug('[Debug] 正在發送 POST 請求...');
-await sendPostRequest(page, csrfToken, snValue, logger); // 將 logger 作為參數傳遞給 sendPostRequest
-logger.debug('[Debug] POST 請求已發送');
 
-// 等待頁面跳轉
-logger.debug('[Debug] 等待頁面跳轉...');
-await page.waitForNavigation(); 
-logger.debug(`[Debug] 頁面已跳轉到: ${page.url()}`);
-content_copy
- Use code with caution.
-
-} else {
-logger.error('[Debug] 無法從 URL 中提取 sn 參數');
-}
-}
-
-async function getCsrfToken(page, logger) { // 添加 logger 參數
-logger.debug('[Debug] 正在請求 CSRF token...');
-const response = await page.request.get("https://fuli.gamer.com.tw/ajax/getCSRFToken.php?_=1702883537159");
-logger.debug('[Debug] CSRF token 請求已發送');
-
-const token = await response.text();
-logger.debug([Debug] CSRF token 響應: ${token});
-return token.trim();
-}
-
-async function sendPostRequest(page, csrfToken, snValue, logger) { // 添加 logger 參數
-logger.debug('[Debug] 正在發送 POST 請求...');
+// 使用 application/x-www-form-urlencoded 格式發送 POST 請求
 const response = await page.request.post("https://fuli.gamer.com.tw/ajax/finish_ad.php", {
-data: {
-token: csrfToken,
-area: "item",
-sn: snValue // 使用提取到的 snValue
-}
+headers: {
+'Content-Type': 'application/x-www-form-urlencoded'
+},
+body: token=${encodeURIComponent(csrfToken)}&area=item&sn=${encodeURIComponent(snValue)}
 });
+
 logger.debug('[Debug] POST 請求已發送');
 
 // 檢查響應狀態碼
