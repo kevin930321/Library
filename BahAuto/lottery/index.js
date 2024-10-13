@@ -48,6 +48,11 @@ var lottery_default = {
             await task_page.waitForSelector("#BH-master > .BH-lbox.fuli-pbox h1");
             await task_page.waitForTimeout(100);
 
+            // --- 跳過廣告流程 ---
+            logger.log(`正在跳過廣告: ${name}`); 
+            await executeAdSkippingProcess(task_page, logger);
+            // --- 跳過廣告流程結束 ---
+
             if (await task_page.$(".btn-base.c-accent-o.is-disable")) {
               logger.log(`${name} 的廣告免費次數已用完 \u001b[92m✔\u001b[m`);
               delete unfinished[name];
@@ -55,16 +60,15 @@ var lottery_default = {
             }
             logger.log(`[${idx + 1} / ${draws.length}] (${attempts}) ${name}`);
 
-              // --- 跳過廣告流程 ---
-            logger.log(`正在跳過廣告: ${name}`); 
-            await executeAdSkippingProcess(task_page, logger);
-            // --- 跳過廣告流程結束 ---
-
             // --- 檢查是否需要回答問題，並點擊 "看廣告免費兌換" ---
             await Promise.all([
               task_page.waitForResponse(/ajax\/check_ad.php/, { timeout: 5e3 }).catch(() => {
               }),
               task_page.click("text=看廣告免費兌換").catch(() => {
+              }),
+              task_page.waitForSelector(".fuli-ad__qrcode", {
+                timeout: 5e3
+              }).catch(() => {
               })
             ]);
 
