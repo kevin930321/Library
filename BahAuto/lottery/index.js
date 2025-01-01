@@ -1,8 +1,7 @@
 import { NotFoundError, solve } from "recaptcha-solver";
 import { Pool } from "@jacoblincool/puddle";
-import { chromium } from 'playwright';
 
-const lottery_default = {
+var lottery_default = {
     name: "福利社",
     description: "福利社抽獎",
     async run({ page, shared, params, logger }) {
@@ -31,6 +30,7 @@ const lottery_default = {
                 const { link, name } = draws[idx];
                 const task_page = await context.newPage();
                 const recaptcha = { process: false };
+
                 task_page.on("response", async (response) => {
                     if (response.url().includes("recaptcha/api2/userverify")) {
                         const text = (await response.text()).replace(")]}'\n", "");
@@ -54,303 +54,309 @@ const lottery_default = {
                             break;
                         }
                         logger.log(`[${idx + 1} / ${draws.length}] (${attempts}) ${name}`);
+                       
+                        //跳過廣告的核心邏輯
+                         const adButton = await task_page.$('a[onclick^="window.FuliAd.checkAd"]');
+                         if (!adButton)
+                         {
+                             logger.log(`[${idx + 1} / ${draws.length}] (${attempts}) ${name} 沒有廣告按鈕，跳過`);
+                             break;
+                         }
+                           
+                            // 取得sn
+                         const urlParams = new URLSearchParams(task_page.url());
+                            const snValue = urlParams.get('sn');
+                         if (!snValue){
+                           logger.error("無法取得 sn 參數");
+                            break;
+                        }
+                                            
+                       
+                         for (let retried = 1; retried <= CHANGING_RETRY; retried++) {
+                            try{
+                                //確認是否需要回答問題
+                             if (await task_page.$eval(
+                                ".dialogify",
+                                (elm) => elm.textContent.includes("勇者問答考驗")
+                                ).catch(() => {
+                                })
+                            )
+                                {
+                                 logger.info(`需要回答問題，正在回答問題`);
+                                 await task_page.$$eval(
+                                    "#dialogify_1 .dialogify__body a",
+                                    (options) => {
+                                        options.forEach(
+                                            (option) => {
+                                              if (option.dataset.option == option.dataset.answer)
+                                                 option.click();
+                                            }
+                                          );
+                                    }
+                                    );
+                                  await task_page.waitForSelector("#btn-buy");
+                                  await task_page.waitForTimeout(100);
+                                 await task_page.click("#btn-buy");
+                                 }
 
-                        let ad_skipped = false;
-                        for (let retried = 1; retried <= CHANGING_RETRY; retried++) {
 
-                           const checkAdResponse = await task_page.waitForResponse(response =>
-                                response.url().includes('/ajax/check_ad.php') && response.request().method() === 'GET'
-                            );
+                                const check_ad_response = await task_page.request.get(`https://fuli.gamer.com.tw/ajax/check_ad.php?area=item&sn=${encodeURIComponent(snValue)}`);
+                                const check_ad_response_data = await check_ad_response.json();
 
-                           try {
-                              const responseData = await checkAdResponse.json();
-                              if(responseData.data && responseData.data.finished === 1){
-                                  logger.info('廣告已看過或跳過, 準備跳轉兌換頁面');
-                                  ad_skipped = true;
-                                  break;
-                               }
-                            } catch(error){
-                               logger.error(`check_ad.php JSON解析錯誤 :${error}`);
-                            }
+                            if(check_ad_response_data?.data?.finished === 1){
+                                    logger.log('你已經看過/跳過廣告了!');
+                                    await task_page.click('a[onclick^="window.FuliAd.checkAd"]');
+                                    break;
+                             }
 
-                           if (!ad_skipped){
-                             // 這裡觸發"看廣告免費兌換按鈕"，而不是去執行點擊事件
-                             await Promise.all([
-                                 task_page.waitForResponse(response =>
-                                     response.url().includes('/ajax/finish_ad.php') && response.request().method() === 'POST'
-                                  ),
-                                 task_page.click("text=看廣告免費兌換").catch(() => { }),
-                                 task_page.waitForSelector(".dialogify__content").catch(()=>{})
-                             ]);
-                             const confirmButton = await task_page.$('.btn-box .btn-insert.btn-primary');
-                              if(confirmButton){
-                                 await task_page.evaluate((btn)=> btn.disabled = true,confirmButton);
-                                 await task_page.evaluate((btn)=> btn.style.backgroundColor = '#e5e5e5',confirmButton);
+                                   //get token
+                                  const tokenResponse = await task_page.request.get('https://fuli.gamer.com.tw/ajax/getCSRFToken.php?_='+ Date.now());
+                                  const token =  await tokenResponse.text();
+                                 
+                                //send POST request to simulate watched ad.
+                              const finish_ad_response =  await  task_page.request.post("https://fuli.gamer.com.tw/ajax/finish_ad.php", {
+                                        headers: {
+                                         "Content-Type": "application/x-www-form-urlencoded"
+                                         },
+                                         data: `token=${encodeURIComponent(token.trim())}&area=item&sn=${encodeURIComponent(snValue)}`
+                                    });
 
-                                 const cancelButton = await task_page.$('.btn-box .btn-insert:not(.btn-primary)')
+                                 if(!finish_ad_response.ok()){
+                                     logger.error(`[${idx + 1} / ${draws.length}] (${attempts}) ${name} - 廣告請求失敗! (${retried}/${CHANGING_RETRY})`);
+                                   continue;
+                                 }
 
-                                 if(cancelButton) {
-                                      await task_page.waitForTimeout(1000)
-                                      await cancelButton.click();
-                                       if (confirmButton) {
-                                          await task_page.evaluate((btn)=> btn.disabled = false, confirmButton);
-                                          await task_page.evaluate((btn)=> btn.style.backgroundColor = '',confirmButton);
-                                      }
-                                   }
+                              await task_page.click('a[onclick^="window.FuliAd.checkAd"]');
+                               
+                               
+                              const dialog = await task_page.$('.dialogify__content');
+
+                              if(dialog){
+                                await task_page.waitForTimeout(500)
+                                   const confirmButton = await dialog.$('.btn-box .btn-insert.btn-primary')
+                                  
+                                  if (confirmButton)
+                                   {
+                                         await  confirmButton.evaluate(node => {
+                                              node.disabled=true;
+                                                 node.style.backgroundColor='#e5e5e5';
+                                              });
+                                     }
+                                     const cancelButton = await dialog.$('.btn-box .btn-insert:not(.btn-primary)');
+                                       if(cancelButton)
+                                        {
+                                            await cancelButton.click();
+                                            if (confirmButton) {
+                                                await  confirmButton.evaluate(node => {
+                                                    node.disabled=false;
+                                                      node.style.backgroundColor='';
+                                                });
+                                             }
+
+                                          }
+
 
                               }
-                            //觸發post finish_ad.php後, 會直接呼叫看廣告的按鈕, 會走到else if
-                           }
-                            break;
+                             break;
 
-                         }
-                        
-                      
-
-                        if (await task_page.$eval(
-                          ".dialogify",
-                          (elm) => elm.textContent.includes("勇者問答考驗")
-                        ).catch(() => {
-                        })) {
-                          logger.info(`需要回答問題，正在回答問題`);
-                            await task_page.$$eval(
-                            "#dialogify_1 .dialogify__body a",
-                            (options) => {
-                            options.forEach(
-                            (option) => {
-                                    if (option.dataset.option == option.dataset.answer)
-                                    option.click();
-                                    }
-                                  );
-                                }
-                              );
-                                  await task_page.waitForSelector("#btn-buy");
-                                await task_page.waitForTimeout(100);
-                              await task_page.click("#btn-buy");
-                          }
-
-
-                        await Promise.all([
-                            task_page.waitForSelector(".dialogify .dialogify__body p", { timeout: 5e3 }).catch(() => {
-                            }),
-                            task_page.waitForSelector("button:has-text('確定')", { timeout: 5e3 }).catch(() => {
-                            })
-                        ]);
-                        const ad_status = await task_page.$eval(
-                            ".dialogify .dialogify__body p",
-                            (elm) => elm.innerText
-                        ).catch(() => {
-                        }) || "";
-                         
-                        if (ad_status.includes("廣告能量補充中")) {
-                            logger.error("廣告能量補充中");
-                             await task_page.reload().catch((...args) => logger.error(...args));
-                            continue;
-                        }  else if (ad_status.includes("觀看廣告") || ad_skipped ) {
-                            logger.log(ad_status.includes("觀看廣告") ? `正在觀看廣告` : `廣告已跳過,準備跳轉兌換頁面` );
-                             await task_page.click('button:has-text("確定")');
-                                   
-                                 //   這裡不要跑shared.ad_handler 因為根本沒廣告畫面出現，不需要處理
-                            if (ad_status.includes("觀看廣告") ){
-                             await task_page.waitForSelector("ins iframe").catch((...args) => logger.error(...args));
-                            await task_page.waitForTimeout(1e3);
-                            const ad_iframe = await task_page.$("ins iframe").catch(
-                            (...args) => logger.error(...args)
-                            );
-                             let ad_frame;
-                              try {
-                                ad_frame = await ad_iframe.contentFrame();
-                                    await shared.ad_handler({ ad_frame });
-                                } catch (err) {
-                                logger.error(err);
-                               }
-                               await task_page.waitForTimeout(1e3);
-
+                            }catch (e){
+                                  logger.error(e);
                             }
 
 
-                        }  else if (ad_status) {
-                             logger.log(ad_status);
-                           }
-
-
-                         const final_url = task_page.url();
-                         if (final_url.includes("/buyD.php") && final_url.includes("ad=1")) {
-                             logger.log(`正在確認結算頁面`);
-                              await checkInfo(task_page, logger).catch(
-                              (...args) => logger.error(...args)
-                              );
-                            await confirm(task_page, logger, recaptcha).catch(
-                            (...args) => logger.error(...args)
-                            );
-                              if (await task_page.$(".card > .section > p") && await task_page.$eval(
-                                    ".card > .section > p",
-                                      (elm) => elm.innerText.includes("成功")
-                                  )) {
-                                logger.success(`已完成一次抽抽樂：${name} \u001b[92m✔\u001b[m`);
-                                lottery++;
-                            } else {
-                              logger.error("發生錯誤，重試中 \u001b[91m✘\u001b[m");
-                            }
-                          } else {
-                           logger.warn(final_url);
-                           logger.error("未進入結算頁面，重試中 \u001b[91m✘\u001b[m");
                         }
-                        } catch (err) {
+
+
+
+                         
+
+                        const final_url = task_page.url();
+
+                        if (final_url.includes("/buyD.php") && final_url.includes("ad=1")) {
+                            logger.log(`正在確認結算頁面`);
+                            await checkInfo(task_page, logger).catch(
+                                (...args) => logger.error(...args)
+                            );
+                            await confirm(task_page, logger, recaptcha).catch(
+                                (...args) => logger.error(...args)
+                            );
+                             if (await task_page.$(".card > .section > p") && await task_page.$eval(
+                                 ".card > .section > p",
+                                  (elm) => elm.innerText.includes("成功")
+                                )
+                              ) {
+                                    logger.success(`已完成一次抽抽樂：${name} \u001b[92m✔\u001b[m`);
+                                     lottery++;
+                                } else {
+                                      logger.error("發生錯誤，重試中 \u001b[91m✘\u001b[m");
+                             }
+
+                           } else {
+                                logger.warn(final_url);
+                                logger.error("未進入結算頁面，重試中 \u001b[91m✘\u001b[m");
+                           }
+                       
+
+                    } catch (err) {
                         logger.error("!", err);
                     }
-                  }
-                  await task_page.close();
-              });
+                }
+                await task_page.close();
+            });
         }
-         await pool.go();
-            await page.waitForTimeout(2e3);
+        await pool.go();
+        await page.waitForTimeout(2e3);
         logger.log(`執行完畢 ✨`);
         if (shared.report) {
-          shared.report.reports["福利社抽獎"] = report({ lottery, unfinished });
-      }
+            shared.report.reports["福利社抽獎"] = report({ lottery, unfinished });
+        }
         return { lottery, unfinished };
-   }
+    }
 };
+
+
+
 async function getList(page, logger) {
     let draws;
     await page.context().addCookies([{ name: "ckFuli_18UP", value: "1", domain: "fuli.gamer.com.tw", path: "/" }]);
     let attempts = 3;
     while (attempts-- > 0) {
-      draws = [];
-    try {
-       await page.goto("https://fuli.gamer.com.tw/shop.php?page=1");
-      let items = await page.$$("a.items-card");
-     for (let i = items.length - 1; i >= 0; i--) {
-           let is_draw = await items[i].evaluate(
-            (elm) => elm.innerHTML.includes("抽抽樂")
-            );
-           if (is_draw) {
-            draws.push({
-               name: await items[i].evaluate(
-               (node) => node.querySelector(".items-title").innerHTML
-              ),
-               link: await items[i].evaluate((elm) => elm.href)
-           });
+        draws = [];
+        try {
+            await page.goto("https://fuli.gamer.com.tw/shop.php?page=1");
+            let items = await page.$$("a.items-card");
+            for (let i = items.length - 1; i >= 0; i--) {
+                let is_draw = await items[i].evaluate(
+                    (elm) => elm.innerHTML.includes("抽抽樂")
+                );
+                if (is_draw) {
+                    draws.push({
+                        name: await items[i].evaluate(
+                            (node) => node.querySelector(".items-title").innerHTML
+                        ),
+                        link: await items[i].evaluate((elm) => elm.href)
+                    });
+                }
             }
-         }
-         while (await page.$eval(
-        "a.pagenow",
-          (elm) => elm.nextSibling ? true : false
-          )) {
-              await page.goto(
-             "https://fuli.gamer.com.tw/shop.php?page=" + await page.$eval(
-                  "a.pagenow",
-              (elm) => elm.nextSibling.innerText
-              )
-           );
-              let items2 = await page.$$("a.items-card");
-               for (let i = items2.length - 1; i >= 0; i--) {
-                  let is_draw = await items2[i].evaluate(
-                    (node) => node.innerHTML.includes("抽抽樂")
-                     );
-                 if (is_draw) {
-                  draws.push({
-                name: await items2[i].evaluate(
-                     (node) => node.querySelector(".items-title").innerHTML
-                         ),
-                link: await items2[i].evaluate((elm) => elm.href)
-            });
-         }
-         }
-       }
-      break;
-   } catch (err) {
-     logger.error(err);
+            while (await page.$eval(
+                "a.pagenow",
+                (elm) => elm.nextSibling ? true : false
+            )) {
+                await page.goto(
+                    "https://fuli.gamer.com.tw/shop.php?page=" + await page.$eval(
+                        "a.pagenow",
+                        (elm) => elm.nextSibling.innerText
+                    )
+                );
+                let items2 = await page.$$("a.items-card");
+                for (let i = items2.length - 1; i >= 0; i--) {
+                    let is_draw = await items2[i].evaluate(
+                        (node) => node.innerHTML.includes("抽抽樂")
+                    );
+                    if (is_draw) {
+                        draws.push({
+                            name: await items2[i].evaluate(
+                                (node) => node.querySelector(".items-title").innerHTML
+                            ),
+                            link: await items2[i].evaluate((elm) => elm.href)
+                        });
+                    }
+                }
+            }
+            break;
+        } catch (err) {
+            logger.error(err);
         }
     }
-      return draws;
+    return draws;
 }
 async function checkInfo(page, logger) {
-   try {
+    try {
         const name = await page.$eval("#name", (elm) => elm.value);
-       const tel = await page.$eval("#tel", (elm) => elm.value);
-     const city = await page.$eval("[name=city]", (elm) => elm.value);
-     const country = await page.$eval("[name=country]", (elm) => elm.value);
-       const address = await page.$eval("#address", (elm) => elm.value);
+        const tel = await page.$eval("#tel", (elm) => elm.value);
+        const city = await page.$eval("[name=city]", (elm) => elm.value);
+        const country = await page.$eval("[name=country]", (elm) => elm.value);
+        const address = await page.$eval("#address", (elm) => elm.value);
         if (!name)
-         logger.log("無收件人姓名");
+            logger.log("無收件人姓名");
         if (!tel)
-        logger.log("無收件人電話");
+            logger.log("無收件人電話");
         if (!city)
-         logger.log("無收件人城市");
-       if (!country)
-        logger.log("無收件人區域");
-      if (!address)
-         logger.log("無收件人地址");
-      if (!name || !tel || !city || !country || !address)
-         throw new Error("警告：收件人資料不全");
+            logger.log("無收件人城市");
+        if (!country)
+            logger.log("無收件人區域");
+        if (!address)
+            logger.log("無收件人地址");
+        if (!name || !tel || !city || !country || !address)
+            throw new Error("警告：收件人資料不全");
     } catch (err) {
-       logger.error(err);
-   }
+        logger.error(err);
+    }
 }
 async function confirm(page, logger, recaptcha) {
- try {
-   await page.waitForSelector("input[name='agreeConfirm']", { state: "attached" });
-  if (await (await page.$("input[name='agreeConfirm']")).getAttribute("checked") === null) {
-        await page.click("text=我已閱讀注意事項，並確認兌換此商品");
-   }
-     await page.waitForTimeout(100);
-    await page.waitForSelector("a:has-text('確認兌換')");
+    try {
+        await page.waitForSelector("input[name='agreeConfirm']", { state: "attached" });
+        if (await (await page.$("input[name='agreeConfirm']")).getAttribute("checked") === null) {
+            await page.click("text=我已閱讀注意事項，並確認兌換此商品");
+        }
+        await page.waitForTimeout(100);
+        await page.waitForSelector("a:has-text('確認兌換')");
         await page.click("a:has-text('確認兌換')");
-  const next_navigation = page.waitForNavigation().catch(() => {
-  });
-    await page.waitForSelector("button:has-text('確定')");
-     await page.click("button:has-text('確定')");
-       await page.waitForTimeout(300);
-    if (recaptcha.process === true) {
-       const recaptcha_frame_width = await page.$eval(
-      "iframe[src^='https://www.google.com/recaptcha/api2/bframe']",
-       (elm) => getComputedStyle(elm).width
-     );
-     if (recaptcha_frame_width !== "100%") {
-            logger.log("需要處理 reCAPTCHA");
-        try {
-           await timeout_promise(solve(page, { delay: 64 }), 3e4);
-        } catch (err) {
-          if (err instanceof NotFoundError) {
-              logger.error("reCAPTCHA [Try it later]");
+        const next_navigation = page.waitForNavigation().catch(() => {
+        });
+        await page.waitForSelector("button:has-text('確定')");
+        await page.click("button:has-text('確定')");
+         await page.waitForTimeout(300);
+        if (recaptcha.process === true) {
+           
+           const recaptcha_frame_width = await page.$eval(
+            "iframe[src^='https://www.google.com/recaptcha/api2/bframe']",
+                (elm) => getComputedStyle(elm).width
+          );
+           if (recaptcha_frame_width !== "100%") {
+                 logger.log("需要處理 reCAPTCHA");
+            try {
+                await timeout_promise(solve(page, { delay: 64 }), 3e4);
+            } catch (err) {
+                if (err instanceof NotFoundError) {
+                     logger.error("reCAPTCHA [Try it later]");
+                  }
+                     throw err;
             }
-          throw err;
-       }
-         logger.log("reCAPTCHA 自動處理完成");
-     }
-   }
-    await next_navigation;
-  } catch (err) {
-     logger.error(page.url());
-    logger.error(err);
-   }
+           logger.log("reCAPTCHA 自動處理完成");
+            }
+         }
+            await next_navigation;
+    } catch (err) {
+        logger.error(page.url());
+        logger.error(err);
+    }
 }
 function report({ lottery, unfinished }) {
     let body = "# 福利社抽抽樂 \n\n";
     if (lottery) {
-      body += `✨✨✨ 獲得 **${lottery}** 個抽獎機會，價值 **${(lottery * 500).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}** 巴幣 ✨✨✨
+        body += `✨✨✨ 獲得 **${lottery}** 個抽獎機會，價值 **${(lottery * 500).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}** 巴幣 ✨✨✨
 `;
-     }
-   if (Object.keys(unfinished).length === 0) {
+    }
+    if (Object.keys(unfinished).length === 0) {
         body += "🟢 所有抽獎皆已完成\n";
-     }
-     Object.keys(unfinished).forEach((key) => {
+    }
+    Object.keys(unfinished).forEach((key) => {
         if (unfinished[key] === void 0)
-        return;
+            return;
         body += `❌ 未能自動完成所有 ***[${key}](${unfinished[key]})*** 的抽獎
 `;
-   });
-       body += "\n";
-     return body;
+    });
+    body += "\n";
+    return body;
 }
 function timeout_promise(promise, delay) {
-      return new Promise((resolve, reject) => {
+    return new Promise((resolve, reject) => {
         setTimeout(() => reject("Timed Out"), delay);
-      promise.then(resolve).catch(reject);
-     });
+        promise.then(resolve).catch(reject);
+    });
 }
+
 export {
- lottery_default as default
+    lottery_default as default
 };
