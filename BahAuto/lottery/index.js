@@ -7,8 +7,9 @@ var lottery_default = {
     async run({ page, shared, params, logger }) {
         if (!shared.flags.logged)
             throw new Error("使用者未登入，無法抽獎");
-        if (!shared.ad_handler)
-            throw new Error("需使用 ad_handler 模組");
+        //  注意! 我拿掉了 shared.ad_handler 的錯誤檢查，因為跳過廣告不再需要 ad_handler 模組
+        // if (!shared.ad_handler)
+        //     throw new Error("需使用 ad_handler 模組");
         logger.log(`開始執行`);
         let lottery = 0;
         logger.log("正在尋找抽抽樂");
@@ -43,178 +44,184 @@ var lottery_default = {
                         recaptcha.process = data[5] !== "nocaptcha";
                     }
                 });
+
                 for (let attempts = 1; attempts <= MAX_ATTEMPTS; attempts++) {
                     try {
                         await task_page.goto(link);
                         await task_page.waitForSelector("#BH-master > .BH-lbox.fuli-pbox h1");
                         await task_page.waitForTimeout(100);
+
                         if (await task_page.$(".btn-base.c-accent-o.is-disable")) {
                             logger.log(`${name} 的廣告免費次數已用完 \u001b[92m✔\u001b[m`);
                             delete unfinished[name];
                             break;
                         }
-                        logger.log(`[${idx + 1} / ${draws.length}] (${attempts}) ${name}`);
-                       
-                        //跳過廣告的核心邏輯
+                         logger.log(`[${idx + 1} / ${draws.length}] (${attempts}) ${name}`);
+
+
                          const adButton = await task_page.$('a[onclick^="window.FuliAd.checkAd"]');
                          if (!adButton)
                          {
                              logger.log(`[${idx + 1} / ${draws.length}] (${attempts}) ${name} 沒有廣告按鈕，跳過`);
                              break;
                          }
-                           
-                            // 取得sn
+                         // 取得sn
                          const urlParams = new URLSearchParams(task_page.url());
-                            const snValue = urlParams.get('sn');
+                        const snValue = urlParams.get('sn');
                          if (!snValue){
                            logger.error("無法取得 sn 參數");
                             break;
-                        }
-                                            
-                       
-                         for (let retried = 1; retried <= CHANGING_RETRY; retried++) {
-                            try{
-                                //確認是否需要回答問題
-                             if (await task_page.$eval(
-                                ".dialogify",
-                                (elm) => elm.textContent.includes("勇者問答考驗")
-                                ).catch(() => {
-                                })
-                            )
-                                {
-                                 logger.info(`需要回答問題，正在回答問題`);
-                                 await task_page.$$eval(
-                                    "#dialogify_1 .dialogify__body a",
-                                    (options) => {
-                                        options.forEach(
-                                            (option) => {
-                                              if (option.dataset.option == option.dataset.answer)
-                                                 option.click();
-                                            }
-                                          );
-                                    }
-                                    );
-                                  await task_page.waitForSelector("#btn-buy");
-                                  await task_page.waitForTimeout(100);
-                                 await task_page.click("#btn-buy");
-                                 }
+                         }
+
+                        for (let retried = 1; retried <= CHANGING_RETRY; retried++) {
+
+                         try{
 
 
-                                const check_ad_response = await task_page.request.get(`https://fuli.gamer.com.tw/ajax/check_ad.php?area=item&sn=${encodeURIComponent(snValue)}`);
-                                const check_ad_response_data = await check_ad_response.json();
-
-                            if(check_ad_response_data?.data?.finished === 1){
-                                    logger.log('你已經看過/跳過廣告了!');
-                                    await task_page.click('a[onclick^="window.FuliAd.checkAd"]');
-                                    break;
-                             }
-
-                                   //get token
-                                  const tokenResponse = await task_page.request.get('https://fuli.gamer.com.tw/ajax/getCSRFToken.php?_='+ Date.now());
-                                  const token =  await tokenResponse.text();
-                                 
-                                //send POST request to simulate watched ad.
-                              const finish_ad_response =  await  task_page.request.post("https://fuli.gamer.com.tw/ajax/finish_ad.php", {
-                                        headers: {
-                                         "Content-Type": "application/x-www-form-urlencoded"
-                                         },
-                                         data: `token=${encodeURIComponent(token.trim())}&area=item&sn=${encodeURIComponent(snValue)}`
-                                    });
-
-                                 if(!finish_ad_response.ok()){
-                                     logger.error(`[${idx + 1} / ${draws.length}] (${attempts}) ${name} - 廣告請求失敗! (${retried}/${CHANGING_RETRY})`);
-                                   continue;
-                                 }
-
-                              await task_page.click('a[onclick^="window.FuliAd.checkAd"]');
-                               
-                               
-                              const dialog = await task_page.$('.dialogify__content');
-
-                              if(dialog){
-                                await task_page.waitForTimeout(500)
-                                   const confirmButton = await dialog.$('.btn-box .btn-insert.btn-primary')
-                                  
-                                  if (confirmButton)
-                                   {
-                                         await  confirmButton.evaluate(node => {
-                                              node.disabled=true;
-                                                 node.style.backgroundColor='#e5e5e5';
-                                              });
+                            //check if have question
+                            if (await task_page.$eval(
+                              ".dialogify",
+                              (elm) => elm.textContent.includes("勇者問答考驗")
+                              ).catch(() => {
+                              })
+                            ) {
+                                logger.info(`需要回答問題，正在回答問題`);
+                              await task_page.$$eval(
+                                "#dialogify_1 .dialogify__body a",
+                                (options) => {
+                                   options.forEach(
+                                    (option) => {
+                                    if (option.dataset.option == option.dataset.answer)
+                                        option.click();
                                      }
-                                     const cancelButton = await dialog.$('.btn-box .btn-insert:not(.btn-primary)');
-                                       if(cancelButton)
-                                        {
-                                            await cancelButton.click();
-                                            if (confirmButton) {
-                                                await  confirmButton.evaluate(node => {
-                                                    node.disabled=false;
-                                                      node.style.backgroundColor='';
-                                                });
-                                             }
+                                    );
+                                   }
+                                   );
 
-                                          }
+                                    await task_page.waitForSelector("#btn-buy");
+                                     await task_page.waitForTimeout(100);
+                                    await task_page.click("#btn-buy");
 
-
-                              }
-                             break;
-
-                            }catch (e){
-                                  logger.error(e);
                             }
 
 
-                        }
+
+                           //check if ad was finished or not
+                         const check_ad_response = await task_page.request.get(`https://fuli.gamer.com.tw/ajax/check_ad.php?area=item&sn=${encodeURIComponent(snValue)}`);
+                         const check_ad_response_data = await check_ad_response.json();
+
+
+                         if(check_ad_response_data?.data?.finished === 1){
+                            logger.log('你已經看過/跳過廣告了!');
+                             await task_page.click('a[onclick^="window.FuliAd.checkAd"]');
+                             break;
+
+                          }
 
 
 
-                         
+                          const tokenResponse = await task_page.request.get('https://fuli.gamer.com.tw/ajax/getCSRFToken.php?_=' + Date.now());
+                           const token = await tokenResponse.text();
 
-                        const final_url = task_page.url();
+                          const finish_ad_response =  await task_page.request.post("https://fuli.gamer.com.tw/ajax/finish_ad.php", {
+                               headers: {
+                                "Content-Type": "application/x-www-form-urlencoded"
+                             },
+                            data: `token=${encodeURIComponent(token.trim())}&area=item&sn=${encodeURIComponent(snValue)}`
+                                   });
 
-                        if (final_url.includes("/buyD.php") && final_url.includes("ad=1")) {
-                            logger.log(`正在確認結算頁面`);
-                            await checkInfo(task_page, logger).catch(
-                                (...args) => logger.error(...args)
-                            );
-                            await confirm(task_page, logger, recaptcha).catch(
-                                (...args) => logger.error(...args)
-                            );
-                             if (await task_page.$(".card > .section > p") && await task_page.$eval(
-                                 ".card > .section > p",
-                                  (elm) => elm.innerText.includes("成功")
-                                )
-                              ) {
-                                    logger.success(`已完成一次抽抽樂：${name} \u001b[92m✔\u001b[m`);
-                                     lottery++;
-                                } else {
-                                      logger.error("發生錯誤，重試中 \u001b[91m✘\u001b[m");
-                             }
+                             if (!finish_ad_response.ok()){
+                             logger.error(`[${idx + 1} / ${draws.length}] (${attempts}) ${name} - 廣告請求失敗! (${retried}/${CHANGING_RETRY})`);
+                                  continue;
+                            }
+                             
+                            //click and trigger dialog;
+                          await task_page.click('a[onclick^="window.FuliAd.checkAd"]');
+                                    
+                          const dialog = await task_page.$('.dialogify__content');
+                              if (dialog)
+                             {
+                                await task_page.waitForTimeout(500)
+                                   const confirmButton = await dialog.$('.btn-box .btn-insert.btn-primary')
 
-                           } else {
-                                logger.warn(final_url);
-                                logger.error("未進入結算頁面，重試中 \u001b[91m✘\u001b[m");
+                                 if (confirmButton){
+                                        await confirmButton.evaluate(node =>{
+                                           node.disabled = true;
+                                          node.style.backgroundColor = '#e5e5e5';
+                                         })
+
+                                    }
+                                   const cancelButton = await dialog.$('.btn-box .btn-insert:not(.btn-primary)');
+                                      if (cancelButton) {
+                                        await  cancelButton.click();
+
+                                             if(confirmButton){
+                                                await confirmButton.evaluate(node =>{
+                                                        node.disabled=false;
+                                                        node.style.backgroundColor='';
+                                               });
+
+                                         }
+
+
+                                    }
+
+
                            }
-                       
+                                      break;
 
-                    } catch (err) {
-                        logger.error("!", err);
+                          } catch (e){
+                            logger.error(e);
+                          }
+                     }
+                    const final_url = task_page.url();
+
+                    if (final_url.includes("/buyD.php") && final_url.includes("ad=1")) {
+                        logger.log(`正在確認結算頁面`);
+                        await checkInfo(task_page, logger).catch(
+                            (...args) => logger.error(...args)
+                        );
+                        await confirm(task_page, logger, recaptcha).catch(
+                            (...args) => logger.error(...args)
+                        );
+                         if (await task_page.$(".card > .section > p") && await task_page.$eval(
+                           ".card > .section > p",
+                             (elm) => elm.innerText.includes("成功")
+                            ))
+                        {
+                             logger.success(`已完成一次抽抽樂：${name} \u001b[92m✔\u001b[m`);
+                            lottery++;
+                          }
+                         else
+                         {
+                           logger.error("發生錯誤，重試中 \u001b[91m✘\u001b[m");
+                         }
                     }
+                    else {
+                        logger.warn(final_url);
+                        logger.error("未進入結算頁面，重試中 \u001b[91m✘\u001b[m");
+                    }
+
+                  }
+                   catch (err) {
+                    logger.error("!", err);
                 }
-                await task_page.close();
-            });
-        }
-        await pool.go();
-        await page.waitForTimeout(2e3);
-        logger.log(`執行完畢 ✨`);
-        if (shared.report) {
-            shared.report.reports["福利社抽獎"] = report({ lottery, unfinished });
-        }
-        return { lottery, unfinished };
+            }
+              await task_page.close();
+
+        });
+      }
+
+     await pool.go();
+
+    await page.waitForTimeout(2e3);
+    logger.log(`執行完畢 ✨`);
+    if (shared.report) {
+        shared.report.reports["福利社抽獎"] = report({ lottery, unfinished });
     }
+    return { lottery, unfinished };
+ }
 };
-
-
 
 async function getList(page, logger) {
     let draws;
@@ -295,38 +302,43 @@ async function checkInfo(page, logger) {
 }
 async function confirm(page, logger, recaptcha) {
     try {
-        await page.waitForSelector("input[name='agreeConfirm']", { state: "attached" });
-        if (await (await page.$("input[name='agreeConfirm']")).getAttribute("checked") === null) {
-            await page.click("text=我已閱讀注意事項，並確認兌換此商品");
+         await page.waitForSelector("input[name='agreeConfirm']", { state: "attached" });
+          if (await (await page.$("input[name='agreeConfirm']")).getAttribute("checked") === null) {
+               await page.click("text=我已閱讀注意事項，並確認兌換此商品");
         }
-        await page.waitForTimeout(100);
-        await page.waitForSelector("a:has-text('確認兌換')");
+           await page.waitForTimeout(100);
+         await page.waitForSelector("a:has-text('確認兌換')");
         await page.click("a:has-text('確認兌換')");
-        const next_navigation = page.waitForNavigation().catch(() => {
-        });
+
+         const next_navigation = page.waitForNavigation().catch(() => {});
+
         await page.waitForSelector("button:has-text('確定')");
-        await page.click("button:has-text('確定')");
-         await page.waitForTimeout(300);
-        if (recaptcha.process === true) {
-           
-           const recaptcha_frame_width = await page.$eval(
-            "iframe[src^='https://www.google.com/recaptcha/api2/bframe']",
-                (elm) => getComputedStyle(elm).width
-          );
-           if (recaptcha_frame_width !== "100%") {
-                 logger.log("需要處理 reCAPTCHA");
-            try {
-                await timeout_promise(solve(page, { delay: 64 }), 3e4);
-            } catch (err) {
-                if (err instanceof NotFoundError) {
-                     logger.error("reCAPTCHA [Try it later]");
-                  }
-                     throw err;
-            }
-           logger.log("reCAPTCHA 自動處理完成");
-            }
-         }
-            await next_navigation;
+       await page.click("button:has-text('確定')");
+       await page.waitForTimeout(300);
+          if (recaptcha.process === true)
+          {
+            const recaptcha_frame_width = await page.$eval(
+               "iframe[src^='https://www.google.com/recaptcha/api2/bframe']",
+               (elm) => getComputedStyle(elm).width
+              );
+            if (recaptcha_frame_width !== "100%") {
+                  logger.log("需要處理 reCAPTCHA");
+                try {
+                      await timeout_promise(solve(page, { delay: 64 }), 3e4);
+                   }
+                  catch (err)
+                 {
+                   if (err instanceof NotFoundError)
+                       {
+                        logger.error("reCAPTCHA [Try it later]");
+                       }
+                       throw err;
+                }
+                logger.log("reCAPTCHA 自動處理完成");
+              }
+           }
+       await next_navigation;
+
     } catch (err) {
         logger.error(page.url());
         logger.error(err);
