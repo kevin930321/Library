@@ -130,71 +130,72 @@ var lottery_default = {
                                 break
                             }
                             await adButtonLocator.click();
-                            await task_page.waitForSelector(".dialogify__content", { timeout: 10000 }).catch(() => { });
+                             await task_page.waitForSelector(".dialogify__content", { timeout: 10000 }).catch(() => { });
                             //點擊彈出視窗的取消按鈕
-                            let confirmButton = await task_page.locator('.btn-box .btn-insert.btn-primary')
+                             let confirmButton = await task_page.locator('.btn-box .btn-insert.btn-primary')
                             await confirmButton.evaluate((e) => { e.disabled = true; e.style.backgroundColor = "#e5e5e5" })
-                            let cancelButton = await task_page.locator('.btn-box .btn-insert:not(.btn-primary)')
-                            if (await cancelButton.isVisible()) {
+                             let cancelButton = await task_page.locator('.btn-box .btn-insert:not(.btn-primary)')
+                             if (await cancelButton.isVisible()) {
                                 await cancelButton.click()
-                            }
-                            break;
-                        }
-                        await task_page.waitForTimeout(1000);
+                           }
+                         break;
+                    }
+                         await task_page.waitForTimeout(1000);
                         // 跳過廣告的核心邏輯結束
-                       try {
-                          // 先嘗試等待 "看廣告免費兌換" 按鈕出現
-                            await task_page.waitForSelector("text=看廣告免費兌換", {timeout:5000});
+                           try {
+                               // 先嘗試等待 "看廣告免費兌換" 按鈕出現
+                                await task_page.waitForSelector("text=看廣告免費兌換", {timeout:5000});
 
-                           await Promise.all([
-                                task_page.waitForNavigation({ timeout: 10000 }).catch(()=>{}),
-                                task_page.click("text=看廣告免費兌換").catch(e=>console.warn("點擊看廣告按鈕出錯:",e))
-                              ]);
-                             await task_page.waitForLoadState('networkidle', { timeout: 10000 });
+                                await Promise.all([
+                                 task_page.click("text=看廣告免費兌換").catch(e=>console.warn("點擊看廣告按鈕出錯:",e)),
+                                   task_page.waitForURL("**/buyD.php*", {timeout: 10000})
+                             ]);
 
-                           const final_url = task_page.url();
+                            // 等待網頁完全加載
+                              await task_page.waitForLoadState('networkidle', { timeout: 10000 });
 
+
+                             const final_url = task_page.url();
                              if (!(final_url.includes("/buyD.php") && final_url.includes("ad=1"))) {
-                                     logger.warn("當前頁面網址為：", final_url);
-                                     throw new Error("未成功進入結算頁面，重新嘗試點擊按鈕")
+                                   logger.warn("當前頁面網址為：", final_url);
+                                   throw new Error("未成功進入結算頁面")
                             }
-                                  logger.log(`正在確認結算頁面`);
-                              await checkInfo(task_page, logger).catch(
-                                 (...args) => logger.error(...args)
-                                 );
-                               await confirm(task_page, logger, recaptcha).catch(
-                               (...args) => logger.error(...args)
-                               );
-                                  if (await task_page.$(".card > .section > p") && await task_page.$eval(
+                             logger.log(`正在確認結算頁面`);
+                            await checkInfo(task_page, logger).catch(
+                                   (...args) => logger.error(...args)
+                                   );
+                              await confirm(task_page, logger, recaptcha).catch(
+                                    (...args) => logger.error(...args)
+                              );
+                             if (await task_page.$(".card > .section > p") && await task_page.$eval(
                                      ".card > .section > p",
-                                      (elm) => elm.innerText.includes("成功")
-                                      )) {
+                                        (elm) => elm.innerText.includes("成功")
+                                  )) {
                                       logger.success(`已完成一次抽抽樂：${name} \u001b[92m✔\u001b[m`);
-                                 lottery++;
-                             } else {
-                             logger.error("發生錯誤，重試中 \u001b[91m✘\u001b[m");
-                              }
-
-                                  }catch(error){
-                                      logger.warn(`點擊按鈕後進入結算頁面失敗， 錯誤訊息：`, error)
-                                        logger.error("未進入結算頁面，重試中 \u001b[91m✘\u001b[m");
-
-                             }
+                                  lottery++;
+                                 } else {
+                                    logger.error("發生錯誤，重試中 \u001b[91m✘\u001b[m");
+                                   }
+                            } catch(error){
+                               logger.warn(`點擊按鈕後進入結算頁面失敗， 錯誤訊息：`, error)
+                            logger.error("未進入結算頁面，重試中 \u001b[91m✘\u001b[m");
                          }
-                         catch (err) {
-                           logger.error("!", err);
+
                          }
-                   }
-                    await task_page.close();
-               });
-        }
-       await pool.go();
-       await page.waitForTimeout(2e3);
+                    catch (err) {
+                       logger.error("!", err);
+                    }
+                }
+              await task_page.close();
+            });
+      }
+        await pool.go();
+      await page.waitForTimeout(2e3);
       logger.log(`執行完畢 ✨`);
-        if (shared.report) {
-            shared.report.reports["福利社抽獎"] = report({ lottery, unfinished });
-        }
-      return { lottery, unfinished };
+    if (shared.report) {
+        shared.report.reports["福利社抽獎"] = report({ lottery, unfinished });
+     }
+   return { lottery, unfinished };
     }
 };
 
@@ -281,11 +282,10 @@ async function confirm(page, logger, recaptcha) {
         await page.waitForTimeout(100);
         await page.waitForSelector("a:has-text('確認兌換')");
         await page.click("a:has-text('確認兌換')");
-         const next_navigation = page.waitForNavigation().catch(() => { });
+       const next_navigation = page.waitForNavigation().catch(() => { });
           await page.waitForSelector("button:has-text('確定')");
          await page.click("button:has-text('確定')");
-         await page.waitForTimeout(300);
-
+        await page.waitForTimeout(300);
         if (recaptcha.process === true) {
             const recaptcha_frame_width = await page.$eval(
                 "iframe[src^='https://www.google.com/recaptcha/api2/bframe']",
@@ -304,8 +304,7 @@ async function confirm(page, logger, recaptcha) {
                 logger.log("reCAPTCHA 自動處理完成");
             }
         }
-        await next_navigation;
-
+       await next_navigation;
     } catch (err) {
         logger.error(page.url());
         logger.error(err);
