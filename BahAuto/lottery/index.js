@@ -1,9 +1,5 @@
 import { NotFoundError, solve } from "recaptcha-solver";
 import { Pool } from "@jacoblincool/puddle";
-import playwright from 'playwright-extra';
-import stealth from 'puppeteer-extra-plugin-stealth';
-
-playwright.use(stealth());
 
 var lottery_default = {
     name: "福利社",
@@ -30,9 +26,7 @@ var lottery_default = {
             pool.push(async () => {
                 const idx = i;
                 const { link, name } = draws[idx];
-                 // 使用 playwright-extra 建立新的頁面
-                 const task_browser = await playwright.chromium.launch();
-                 const task_page = await task_browser.newPage();
+                const task_page = await context.newPage();
                 const recaptcha = { process: false };
                 task_page.on("response", async (response) => {
                     if (response.url().includes("recaptcha/api2/userverify")) {
@@ -181,8 +175,7 @@ var lottery_default = {
                         logger.error("!", err);
                     }
                 }
-                 await task_browser.close();
-                // await task_page.close(); // 這裡不需要關閉頁面，會由pool的邏輯處理。
+                await task_page.close();
             });
         }
         await pool.go();
