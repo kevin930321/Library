@@ -1,5 +1,9 @@
 import { NotFoundError, solve } from "recaptcha-solver";
 import { Pool } from "@jacoblincool/puddle";
+import playwright from 'playwright-extra';
+import stealth from 'puppeteer-extra-plugin-stealth';
+
+playwright.use(stealth());
 
 var lottery_default = {
     name: "福利社",
@@ -26,7 +30,9 @@ var lottery_default = {
             pool.push(async () => {
                 const idx = i;
                 const { link, name } = draws[idx];
-                const task_page = await context.newPage();
+                 // 使用 playwright-extra 建立新的頁面
+                 const task_browser = await playwright.chromium.launch();
+                 const task_page = await task_browser.newPage();
                 const recaptcha = { process: false };
                 task_page.on("response", async (response) => {
                     if (response.url().includes("recaptcha/api2/userverify")) {
@@ -140,16 +146,15 @@ var lottery_default = {
                             }
                             break;
                         }
-                         await task_page.waitForTimeout(1000);
+                        await task_page.waitForTimeout(1000);
                         // 跳過廣告的核心邏輯結束
-                      
-                        const urlParams = new URLSearchParams(task_page.url().split('?')[1]);
-                        const snValue = urlParams.get('sn');
-                        const buyDUrl = `https://fuli.gamer.com.tw/buyD.php?ad=1&sn=${snValue}`;
-                        await task_page.goto(buyDUrl);
-                           await task_page.waitForLoadState('networkidle');
-
-
+                        await Promise.all([
+                            task_page.waitForResponse(/ajax\/check_ad.php/, { timeout: 5e3 }).catch(() => {
+                            }),
+                            task_page.click("text=看廣告免費兌換").catch(() => {
+                            })
+                        ]);
+                        await task_page.waitForTimeout(1500); // 加入 1.5 秒的等待時間
                         const final_url = task_page.url();
                         if (final_url.includes("/buyD.php") && final_url.includes("ad=1")) {
                             logger.log(`正在確認結算頁面`);
@@ -176,7 +181,8 @@ var lottery_default = {
                         logger.error("!", err);
                     }
                 }
-                await task_page.close();
+                 await task_browser.close();
+                // await task_page.close(); // 這裡不需要關閉頁面，會由pool的邏輯處理。
             });
         }
         await pool.go();
