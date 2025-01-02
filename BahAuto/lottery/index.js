@@ -108,7 +108,7 @@ var lottery_default = {
                          })) {
                              logger.info(`需要回答問題，正在回答問題`);
                             await task_page.$$eval(
-                                "#dialogify_1 .dialogify__body a",
+                                ".dialogify .dialogify__body a",
                                 (options) => {
                                     options.forEach(
                                     (option) => {
