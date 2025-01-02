@@ -21,15 +21,12 @@ var lottery_default = {
         const MAX_ATTEMPTS = +params.max_attempts || +shared.max_attempts || 20;
         const CHANGING_RETRY = +params.changing_retry || +shared.changing_retry || 3;
         const context = page.context();
-        const browser = page.browser(); //取得 browser 物件
         const pool = new Pool(PARRALLEL);
-
         for (let i = 0; i < draws.length; i++) {
             pool.push(async () => {
                 const idx = i;
                 const { link, name } = draws[idx];
-                const task_page = await context.newPage({ ignoreDefaultArgs: ['--enable-automation'] });
-                await task_page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36'); //設定 user agent
+                const task_page = await context.newPage();
                 const recaptcha = { process: false };
                 task_page.on("response", async (response) => {
                     if (response.url().includes("recaptcha/api2/userverify")) {
@@ -327,6 +324,7 @@ function timeout_promise(promise, delay) {
         promise.then(resolve).catch(reject);
     });
 }
+
 export {
     lottery_default as default
 };
