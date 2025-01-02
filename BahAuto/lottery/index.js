@@ -192,8 +192,19 @@ var lottery_default = {
 
 // 檢查是否已觀看廣告
 async function watchAdCheck(page, logger) {
-    const urlParams = new URLSearchParams(page.url());
-    const snValue = urlParams.get('sn');
+  let snValue;
+   
+   try {
+    snValue = await page.$eval('a[onclick^="window.FuliAd.checkAd"]', (element) => {
+      const onclick = element.getAttribute('onclick');
+       const match = onclick.match(/checkAd\('item',(\d+)\)/);
+       return match ? match[1] : null;
+       })
+    }
+      catch(e){
+         logger.log('無法獲取sn參數',e)
+         return { finished:false};
+       }
 
     if (!snValue) {
         logger.log('無法獲取sn參數');
@@ -216,40 +227,73 @@ async function watchAdCheck(page, logger) {
 
 // 處理廣告彈窗
 async function handleAdDialog(page,logger) {
-        await page.waitForSelector('.dialogify__content');
-        const confirmButton = await page.$('.btn-box .btn-insert.btn-primary');
-       
-            if (confirmButton) {
-               await confirmButton.evaluate(btn => btn.disabled = true);
-                await confirmButton.evaluate(btn => btn.style.backgroundColor = '#e5e5e5');
+     try{
+
+          await page.waitForSelector('.dialogify__content', {timeout:5000}).catch(()=>{});
+          const dialog = await page.$('.dialogify__content')
+
+        if(dialog){
+               const ad_status = await page.$eval(
+                   ".dialogify .dialogify__body p",
+                   (elm) => elm.innerText
+               ).catch(() => {
+               }) || "";
+               // 只有不是 廣告能量補充中 的視窗才跳過
+                 if (!ad_status.includes("廣告能量補充中")) {
+                   
+                    const confirmButton = await dialog.$('.btn-box .btn-insert.btn-primary');
+          
+                     if (confirmButton) {
+                           await confirmButton.evaluate(btn => btn.disabled = true);
+                          await confirmButton.evaluate(btn => btn.style.backgroundColor = '#e5e5e5');
+                     }
+
+
+                        await new Promise(resolve => setTimeout(resolve, 500))
+          
+                           const cancelButton = await dialog.$('.btn-box .btn-insert:not(.btn-primary)');
+           
+                            if(cancelButton){
+                                await cancelButton.click();
+                                  if(confirmButton){
+                                         await confirmButton.evaluate(btn => btn.disabled = false);
+                                           await confirmButton.evaluate(btn => btn.style.backgroundColor = '');
+                                  }
+                              }
+                         await new Promise(resolve => setTimeout(resolve, 1000));
+                   }
+        }else {
+          logger.log("找不到對話視窗");
         }
+         
+    }catch (error) {
+      logger.error("處理對話視窗時發生錯誤", error);
+    }
 
-
-     await new Promise(resolve => setTimeout(resolve, 500))
-
-            const cancelButton = await page.$('.btn-box .btn-insert:not(.btn-primary)');
-
-          if(cancelButton){
-                 await cancelButton.click();
-                if(confirmButton){
-                     await confirmButton.evaluate(btn => btn.disabled = false);
-                      await confirmButton.evaluate(btn => btn.style.backgroundColor = '');
-                }
-            }
-        await new Promise(resolve => setTimeout(resolve, 1000));
-    
  }
 
 // 發送已看完廣告的請求
  async function sendPostRequest(page, logger) {
-     const urlParams = new URLSearchParams(page.url());
-    const snValue = urlParams.get('sn');
-
+  
+      let snValue;
+      try {
+          snValue = await page.$eval('a[onclick^="window.FuliAd.checkAd"]', (element) => {
+               const onclick = element.getAttribute('onclick');
+              const match = onclick.match(/checkAd\('item',(\d+)\)/);
+               return match ? match[1] : null;
+         })
+       }
+      catch(e){
+       logger.log('無法獲取sn參數',e)
+         return
+      }
 
       if (!snValue) {
         logger.log('無法獲取sn參數');
         return;
      }
+
+    
         const csrfToken = await getCsrfToken(page,logger)
 
           await page.request.post("https://fuli.gamer.com.tw/ajax/finish_ad.php", {
