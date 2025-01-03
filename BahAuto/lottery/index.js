@@ -44,7 +44,7 @@ var lottery_default = {
           try {
             await task_page.goto(link);
             await task_page.waitForSelector("#BH-master > .BH-lbox.fuli-pbox h1");
-            await task_page.waitForTimeout(100);
+            await task_page.waitForTimeout(1e2);
             if (await task_page.$(".btn-base.c-accent-o.is-disable")) {
               logger.log(`${name} 的廣告免費次數已用完 \u001b[92m✔\u001b[m`);
               delete unfinished[name];
