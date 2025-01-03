@@ -51,7 +51,7 @@ var lottery_default = {
               break;
             }
             logger.log(`[${idx + 1} / ${draws.length}] (${attempts}) ${name}`);
-            for (let retried = 1; retried <= CHANGING_RETRY; retried++) {
+             for (let retried = 1; retried <= CHANGING_RETRY; retried++) {
               let adButtonLocator = task_page.locator('a[onclick^="window.FuliAd.checkAd"]');
               if (!(await adButtonLocator.isVisible())) {
                 logger.warn('沒有發現廣告兌換按鈕, 可能為商品次數用盡或是已過期。');
@@ -96,17 +96,6 @@ var lottery_default = {
               const urlParams = new URLSearchParams(task_page.url().split('?')[1]);
               const snValue = urlParams.get('sn');
               logger.log('sn:', encodeURIComponent(snValue))
-              try {
-                const response = await task_page.request.get("https://fuli.gamer.com.tw/ajax/check_ad.php?area=item&sn=" + encodeURIComponent(snValue));
-                const data = JSON.parse(await response.text());
-                if (data.data && data.data.finished === 1) {
-                  logger.info("你已經看過或跳過廣告!");
-                  break;
-                }
-              } catch (e) {
-                logger.error('解析看廣告檢查的請求發生錯誤, 正在重試中:', e);
-                break;
-              }
               const tokenResponse = await task_page.request.get("https://fuli.gamer.com.tw/ajax/getCSRFToken.php?_=1702883537159")
               const csrfToken = (await tokenResponse.text()).trim()
               try {
@@ -130,7 +119,7 @@ var lottery_default = {
               }
               break;
             }
-             await task_page.waitForTimeout(1000);
+            await task_page.waitForTimeout(1000);
             // 跳過廣告的核心邏輯結束
             
             const urlParams = new URLSearchParams(task_page.url().split('?')[1]);
@@ -138,7 +127,6 @@ var lottery_default = {
             const buyDUrl = `https://fuli.gamer.com.tw/buyD.php?ad=1&sn=${snValue}`;
             await task_page.goto(buyDUrl);
             await task_page.waitForTimeout(2000);
-
 
             const final_url = task_page.url();
             if (final_url.includes("/buyD.php") && final_url.includes("ad=1")) {
