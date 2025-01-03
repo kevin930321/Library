@@ -104,7 +104,7 @@ var lottery_default = {
                   break;
                 }
               } catch (e) {
-                logger.error('解析看廣告檢查的請求發生錯誤, 正在重試中:', e);
+                logger.error('解析廣告狀態檢查的請求發生錯誤, 正在重試中:', e);
                 break;
               }
               const tokenResponse = await task_page.request.get("https://fuli.gamer.com.tw/ajax/getCSRFToken.php?_=1702883537159");
@@ -127,7 +127,7 @@ var lottery_default = {
             const snValue = urlParams.get('sn');
             const buyDUrl = `https://fuli.gamer.com.tw/buyD.php?ad=1&sn=${snValue}`;
             await task_page.goto(buyDUrl);
-            await task_page.waitForTimeout(2000);
+            await task_page.waitForTimeout(5000);
             const final_url = task_page.url();
             if (final_url.includes("/buyD.php") && final_url.includes("ad=1")) {
               logger.log(`正在確認結算頁面`);
