@@ -96,15 +96,27 @@ var lottery_default = {
               const urlParams = new URLSearchParams(task_page.url().split('?')[1]);
               const snValue = urlParams.get('sn');
               logger.log('sn:', encodeURIComponent(snValue))
+              let ad_finished = false
               try {
                 const response = await task_page.request.get("https://fuli.gamer.com.tw/ajax/check_ad.php?area=item&sn=" + encodeURIComponent(snValue));
                 const data = JSON.parse(await response.text());
                 if (data.data && data.data.finished === 1) {
                   logger.info("你已經看過或跳過廣告!");
-                  break;
+                  ad_finished = true
                 }
               } catch (e) {
                 logger.error('解析看廣告檢查的請求發生錯誤, 正在重試中:', e);
+                break;
+              }
+              if (ad_finished) {
+                await adButtonLocator.click();
+                await task_page.waitForSelector(".dialogify__content", { timeout: 10000 }).catch(() => { });
+                let confirmButton = await task_page.locator('.btn-box .btn-insert.btn-primary')
+                await confirmButton.evaluate((e) => { e.disabled = true; e.style.backgroundColor = "#e5e5e5" })
+                let cancelButton = await task_page.locator('.btn-box .btn-insert:not(.btn-primary)')
+                if (await cancelButton.isVisible()) {
+                  await cancelButton.click()
+                }
                 break;
               }
               const tokenResponse = await task_page.request.get("https://fuli.gamer.com.tw/ajax/getCSRFToken.php?_=1702883537159")
