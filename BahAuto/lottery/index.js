@@ -122,12 +122,12 @@ var lottery_default = {
               }
               break;
             }
-            await task_page.waitForTimeout(2000);
+            await task_page.waitForTimeout(1000);
             const urlParams = new URLSearchParams(task_page.url().split('?')[1]);
             const snValue = urlParams.get('sn');
             const buyDUrl = `https://fuli.gamer.com.tw/buyD.php?ad=1&sn=${snValue}`;
             await task_page.goto(buyDUrl);
-            await task_page.waitForLoadState('networkidle',{ timeout: 5000 })
+            await task_page.waitForLoadState('networkidle',{ timeout: 3000 })
             const final_url = task_page.url();
             if (final_url.includes("/buyD.php") && final_url.includes("ad=1")) {
               logger.log(`正在確認結算頁面`);
