@@ -101,7 +101,7 @@ var lottery_default = {
                 const data = JSON.parse(await response.text());
                 if (data.data && data.data.finished === 1) {
                   logger.info("你已經看過或跳過廣告!");
-                  await task_page.goto("https://fuli.gamer.com.tw/shop_detail.php?sn=${snValue}");
+                  await task_page.goto(`https://fuli.gamer.com.tw/shop_detail.php?sn=${snValue}`);
                   break;
                 }
               } catch (e) {
