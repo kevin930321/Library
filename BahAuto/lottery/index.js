@@ -45,24 +45,26 @@ var lottery_default = {
             await task_page.goto(link);
             await task_page.waitForSelector("#BH-master > .BH-lbox.fuli-pbox h1");
             await task_page.waitForTimeout(100);
-            if (await task_page.$(".btn-base.c-accent-o.is-disable")) {
-              logger.log(`${name} 的廣告免費次數已用完 \u001b[92m✔\u001b[m`);
-              delete unfinished[name];
-              break;
-            }
-            logger.log(`[${idx + 1} / ${draws.length}] (${attempts}) ${name}`);
-            for (let retried = 1; retried <= CHANGING_RETRY; retried++) {
-              let adButtonLocator = task_page.locator('a[onclick^="window.FuliAd.checkAd"]');
-              if (!(await adButtonLocator.isVisible())) {
-                logger.warn('沒有發現廣告兌換按鈕, 可能為商品次數用盡或是已過期。');
+             if (await task_page.$(".btn-base.c-accent-o.is-disable")) {
+                logger.log(`${name} 的廣告免費次數已用完 \u001b[92m✔\u001b[m`);
+                delete unfinished[name];
                 break;
               }
+            logger.log(`[${idx + 1} / ${draws.length}] (${attempts}) ${name}`);
+            for (let retried = 1; retried <= CHANGING_RETRY; retried++) {
+                let adButtonLocator = task_page.locator('a[onclick^="window.FuliAd.checkAd"]');
+              if (!(await adButtonLocator.isVisible())) {
+                logger.warn('沒有發現廣告兌換按鈕, 可能為商品次數用盡或是已過期, 重新整理頁面。');
+                await task_page.reload();
+                await task_page.waitForLoadState('networkidle',{ timeout: 3e3 })
+                break;
+               }
               let questionButton = await task_page.locator('a[onclick^="showQuestion(1);"]');
               if (await questionButton.isVisible()) {
                 logger.log("需要回答問題，正在回答問題");
-                const tokenResponse = await task_page.request.get("https://fuli.gamer.com.tw/ajax/getCSRFToken.php?_=1702883537159");
+                  const tokenResponse = await task_page.request.get("https://fuli.gamer.com.tw/ajax/getCSRFToken.php?_=1702883537159");
                 const csrfToken = (await tokenResponse.text()).trim();
-                const templateContent = await task_page.locator("#question-popup").innerHTML();
+                  const templateContent = await task_page.locator("#question-popup").innerHTML();
                 let questionNumbers = [];
                 let regex = /data-question="(\d+)"/g;
                 let match;
@@ -75,59 +77,57 @@ var lottery_default = {
                   answers.push(answer);
                 }
                 let formData = {};
-                const urlParams = new URLSearchParams(task_page.url().split('?')[1]);
-                let snValue = urlParams.get('sn');
+                let snValue = getSnFromUrl(task_page.url());
                 formData['sn'] = snValue;
-                formData['token'] = csrfToken;
-                answers.forEach((ans, index) => {
-                  formData[`answer[${index}]`] = ans;
+                  formData['token'] = csrfToken;
+                  answers.forEach((ans, index) => {
+                      formData[`answer[${index}]`] = ans;
                 });
                 try {
-                  await task_page.request.post("https://fuli.gamer.com.tw/ajax/answer_question.php", {
-                    form: formData
+                     await task_page.request.post("https://fuli.gamer.com.tw/ajax/answer_question.php", {
+                        form: formData
                   });
-                  await task_page.reload();
-                  await task_page.waitForLoadState('networkidle');
+                    await task_page.reload();
+                    await task_page.waitForLoadState('networkidle', { timeout: 3e3 });
                 } catch (error) {
-                  logger.error("post 回答問題時發生錯誤,正在重試中");
-                  break;
+                   logger.error("post 回答問題時發生錯誤,正在重試中");
+                    break;
                 }
-              }
-              const urlParams = new URLSearchParams(task_page.url().split('?')[1]);
-              const snValue = urlParams.get('sn');
+               }
+              let snValue = getSnFromUrl(task_page.url());
               logger.log('sn:', encodeURIComponent(snValue));
               try {
                 const response = await task_page.request.get("https://fuli.gamer.com.tw/ajax/check_ad.php?area=item&sn=" + encodeURIComponent(snValue));
-                const data = JSON.parse(await response.text());
-                if (data.data && data.data.finished === 1) {
-                  logger.info("你已經看過或跳過廣告!");
-                  break;
+                  const data = JSON.parse(await response.text());
+                   if (data.data && data.data.finished === 1) {
+                       logger.info("你已經看過或跳過廣告!");
+                        break;
+                    }
+                } catch (e) {
+                   logger.error('解析廣告狀態檢查的請求發生錯誤, 正在重試中:', e);
+                    break;
                 }
-              } catch (e) {
-                logger.error('解析廣告狀態檢查的請求發生錯誤, 正在重試中:', e);
-                break;
-              }
               const tokenResponse = await task_page.request.get("https://fuli.gamer.com.tw/ajax/getCSRFToken.php?_=1702883537159");
-              const csrfToken = (await tokenResponse.text()).trim();
+                const csrfToken = (await tokenResponse.text()).trim();
               try {
-                await task_page.request.post('https://fuli.gamer.com.tw/ajax/finish_ad.php', {
-                  headers: {
-                    "Content-Type": "application/x-www-form-urlencoded"
-                  },
-                  data: "token=" + encodeURIComponent(csrfToken) + "&area=item&sn=" + encodeURIComponent(snValue)
-                });
-              } catch (error) {
-                logger.error("發送已看廣告請求時發生錯誤:", error);
-                break;
+                    await task_page.request.post('https://fuli.gamer.com.tw/ajax/finish_ad.php', {
+                        headers: {
+                          "Content-Type": "application/x-www-form-urlencoded"
+                      },
+                        data: "token=" + encodeURIComponent(csrfToken) + "&area=item&sn=" + encodeURIComponent(snValue)
+                   });
+                } catch (error) {
+                  logger.error("發送已看廣告請求時發生錯誤:", error);
+                    break;
               }
               break;
-            }
+          }
+          
             await task_page.waitForTimeout(1e3);
-            const urlParams = new URLSearchParams(task_page.url().split('?')[1]);
-            const snValue = urlParams.get('sn');
-            const buyDUrl = `https://fuli.gamer.com.tw/buyD.php?ad=1&sn=${snValue}`;
-            await task_page.goto(buyDUrl);
-            await task_page.waitForLoadState('networkidle',{ timeout: 3e3 })
+              let snValue = getSnFromUrl(task_page.url());
+              const buyDUrl = `https://fuli.gamer.com.tw/buyD.php?ad=1&sn=${snValue}`;
+                await task_page.goto(buyDUrl);
+                await task_page.waitForLoadState('networkidle',{ timeout: 3e3 })
             const final_url = task_page.url();
             if (final_url.includes("/buyD.php") && final_url.includes("ad=1")) {
               logger.log(`正在確認結算頁面`);
@@ -137,18 +137,23 @@ var lottery_default = {
                 logger.success(`已完成一次抽抽樂：${name} \u001b[92m✔\u001b[m`);
                 lottery++;
               } else {
-                logger.error("發生錯誤，重試中 \u001b[91m✘\u001b[m");
+                 logger.error("發生錯誤，重試中 \u001b[91m✘\u001b[m");
               }
             } else {
-              logger.warn(final_url);
+                 logger.warn(final_url);
               logger.error("未進入結算頁面，重試中 \u001b[91m✘\u001b[m");
             }
           } catch (err) {
             logger.error("!", err);
           }
-        }
-        await task_page.close();
-      });
+           if (await task_page.$eval(".btn-base.c-accent-o.is-disable", (elm) => elm ? true : false)) {
+                logger.log(`${name} 的廣告免費次數已用完 \u001b[92m✔\u001b[m`);
+                delete unfinished[name];
+                break;
+            }
+         }
+          await task_page.close();
+       });
     }
     await pool.go();
     await page.waitForTimeout(2e3);
@@ -160,40 +165,46 @@ var lottery_default = {
   }
 };
 
+function getSnFromUrl(url) {
+  const urlParams = new URLSearchParams(url.split('?')[1]);
+  return urlParams.get('sn');
+}
 async function getList(page, logger) {
   let draws;
-  await page.context().addCookies([{ name: "ckFuli_18UP", value: "1", domain: "fuli.gamer.com.tw", path: "/" }]);
+    await page.context().addCookies([{ name: "ckFuli_18UP", value: "1", domain: "fuli.gamer.com.tw", path: "/" }]);
   let attempts = 3;
   while (attempts-- > 0) {
-    draws = [];
+      draws = [];
     try {
-      await page.goto("https://fuli.gamer.com.tw/shop.php?page=1");
+        await page.goto("https://fuli.gamer.com.tw/shop.php?page=1");
+        await page.waitForLoadState('networkidle', { timeout: 3e3 });
       let items = await page.$$("a.items-card");
-      for (let i = items.length - 1; i >= 0; i--) {
+        for (let i = items.length - 1; i >= 0; i--) {
         let is_draw = await items[i].evaluate((elm) => elm.innerHTML.includes("抽抽樂"));
         if (is_draw) {
           draws.push({
-            name: await items[i].evaluate((node) => node.querySelector(".items-title").innerHTML),
-            link: await items[i].evaluate((elm) => elm.href),
-          });
-        }
+              name: await items[i].evaluate((node) => node.querySelector(".items-title").innerHTML),
+                link: await items[i].evaluate((elm) => elm.href),
+           });
+          }
       }
       while (await page.$eval("a.pagenow", (elm) => elm.nextSibling ? true : false)) {
-        await page.goto("https://fuli.gamer.com.tw/shop.php?page=" + await page.$eval("a.pagenow", (elm) => elm.nextSibling.innerText));
-        let items2 = await page.$$("a.items-card");
-        for (let i = items2.length - 1; i >= 0; i--) {
+          await page.goto("https://fuli.gamer.com.tw/shop.php?page=" + await page.$eval("a.pagenow", (elm) => elm.nextSibling.innerText));
+        await page.waitForLoadState('networkidle',{ timeout: 3e3 });
+          let items2 = await page.$$("a.items-card");
+          for (let i = items2.length - 1; i >= 0; i--) {
           let is_draw = await items2[i].evaluate((node) => node.innerHTML.includes("抽抽樂"));
           if (is_draw) {
-            draws.push({
+             draws.push({
               name: await items2[i].evaluate((node) => node.querySelector(".items-title").innerHTML),
-              link: await items2[i].evaluate((elm) => elm.href),
-            });
-          }
-        }
+                link: await items2[i].evaluate((elm) => elm.href),
+              });
+            }
+       }
       }
       break;
     } catch (err) {
-      logger.error(err);
+        logger.error(err);
     }
   }
   return draws;
@@ -223,32 +234,32 @@ async function confirm(page, logger, recaptcha) {
     await page.waitForSelector("input[name='agreeConfirm']", { state: "attached" });
     if (await (await page.$("input[name='agreeConfirm']")).getAttribute("checked") === null) {
       await page.click("text=我已閱讀注意事項，並確認兌換此商品");
+        await page.waitForTimeout(100);
     }
-    await page.waitForTimeout(100);
-    await page.waitForSelector("a:has-text('確認兌換')");
-    await page.click("a:has-text('確認兌換')");
-    const next_navigation = page.waitForNavigation().catch(() => {});
-    await page.waitForSelector("button:has-text('確定')");
-    await page.click("button:has-text('確定')");
-    await page.waitForTimeout(300);
+      await page.waitForSelector("a:has-text('確認兌換')");
+      await page.click("a:has-text('確認兌換')");
+        const next_navigation = page.waitForNavigation().catch(() => {});
+        await page.waitForSelector("button:has-text('確定')");
+        await page.click("button:has-text('確定')");
+        await page.waitForTimeout(300);
     if (recaptcha.process === true) {
-      const recaptcha_frame_width = await page.$eval("iframe[src^='https://www.google.com/recaptcha/api2/bframe']", (elm) => getComputedStyle(elm).width);
-      if (recaptcha_frame_width !== "100%") {
-        logger.log("需要處理 reCAPTCHA");
-        try {
-          await timeout_promise(solve(page, { delay: 64 }), 3e4);
-        } catch (err) {
-          if (err instanceof NotFoundError) {
-            logger.error("reCAPTCHA [Try it later]");
+        const recaptcha_frame_width = await page.$eval("iframe[src^='https://www.google.com/recaptcha/api2/bframe']", (elm) => getComputedStyle(elm).width);
+          if (recaptcha_frame_width !== "100%") {
+          logger.log("需要處理 reCAPTCHA");
+            try {
+              await timeout_promise(solve(page, { delay: 64 }), 3e4);
+          } catch (err) {
+            if (err instanceof NotFoundError) {
+              logger.error("reCAPTCHA [Try it later]");
+             }
+              throw err;
           }
-          throw err;
-        }
-        logger.log("reCAPTCHA 自動處理完成");
+              logger.log("reCAPTCHA 自動處理完成");
       }
     }
-    await next_navigation;
+     await next_navigation;
   } catch (err) {
-    logger.error(page.url());
+      logger.error(page.url());
     logger.error(err);
   }
 }
