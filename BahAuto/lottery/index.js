@@ -125,9 +125,10 @@ var lottery_default = {
             await task_page.waitForTimeout(1e3);
             const urlParams = new URLSearchParams(task_page.url().split('?')[1]);
             const snValue = urlParams.get('sn');
-            const buyDUrl = `https://fuli.gamer.com.tw/buyD.php?ad=1&sn=${snValue}`;
-            await task_page.goto(buyDUrl);
-            await task_page.waitForLoadState('networkidle',{ timeout: 3e3 })
+            const shopUrl = `https://fuli.gamer.com.tw/shop_detail.php?sn=${snValue}`;
+            await task_page.goto(shopUrl);
+            await task_page.waitForLoadState('networkidle',{ timeout: 3e3 });
+            task_page.click("text=看廣告免費兌換")
             const final_url = task_page.url();
             if (final_url.includes("/buyD.php") && final_url.includes("ad=1")) {
               logger.log(`正在確認結算頁面`);
@@ -137,10 +138,6 @@ var lottery_default = {
                 logger.success(`已完成一次抽抽樂：${name} \u001b[92m✔\u001b[m`);
                 lottery++;
               } else {
-                await task_page.request.post('https://fuli.gamer.com.tw/ajax/finish_ad.php', {
-                  headers: {
-                    "Content-Type": "application/x-www-form-urlencoded"
-                  }});
                 logger.error("發生錯誤，重試中 \u001b[91m✘\u001b[m");
               }
             } else {
