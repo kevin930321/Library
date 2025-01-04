@@ -128,10 +128,9 @@ var lottery_default = {
             const snValue = urlParams.get('sn');
             const shopUrl = `https://fuli.gamer.com.tw/shop_detail.php?sn=${snValue}`;
             await task_page.goto(shopUrl);
-            await task_page.waitForLoadState('networkidle',{ timeout: 3e3 });
-            await Promise.all([
-             task_page.click("text=看廣告免費兌換").catch(() => {})
-            ])
+            await task_page.waitForTimeout(3e3);
+            await task_page.click("text=看廣告免費兌換").catch(() => {});
+            await task_page.waitForTimeout(3e3)
             const final_url = task_page.url();
             if (final_url.includes("/buyD.php") && final_url.includes("ad=1")) {
               logger.log(`正在確認結算頁面`);
