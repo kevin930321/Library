@@ -71,7 +71,7 @@ var lottery_default = {
               let questionButton = await task_page.locator('a[onclick^="showQuestion(1);"]');
               if (await questionButton.isVisible()) {
                 logger.log("需要回答問題，正在回答問題");
-                const tokenResponse = await task_page.request.get("https://fuli.gamer.com.tw/ajax/getCSRFToken.php?_=1702883537159",{ headers: appHeaders });
+                const tokenResponse = await task_page.request.get("https://fuli.gamer.com.tw/ajax/getCSRFToken.php?_=1702883537159");
                 const csrfToken = (await tokenResponse.text()).trim();
                 const templateContent = await task_page.locator("#question-popup").innerHTML();
                 let questionNumbers = [];
@@ -95,8 +95,7 @@ var lottery_default = {
                 });
                 try {
                   await task_page.request.post("https://fuli.gamer.com.tw/ajax/answer_question.php", {
-                    form: formData,
-                     headers: appHeaders
+                    form: formData
                   });
                   await task_page.reload();
                   await task_page.waitForLoadState('networkidle');
@@ -109,7 +108,7 @@ var lottery_default = {
               const snValue = urlParams.get('sn');
               logger.log('sn:', encodeURIComponent(snValue));
               try {
-                const response = await task_page.request.get("https://fuli.gamer.com.tw/ajax/check_ad.php?area=item&sn=" + encodeURIComponent(snValue),{ headers: appHeaders });
+                const response = await task_page.request.get("https://fuli.gamer.com.tw/ajax/check_ad.php?area=item&sn=" + encodeURIComponent(snValue));
                 const data = JSON.parse(await response.text());
                 if (data.data && data.data.finished === 1) {
                   logger.info("你已經看過或跳過廣告!");           
@@ -119,11 +118,13 @@ var lottery_default = {
                 logger.error('解析廣告狀態檢查的請求發生錯誤, 正在重試中:', e);
                 break;
               }
-              const tokenResponse = await task_page.request.get("https://fuli.gamer.com.tw/ajax/getCSRFToken.php?_=1702883537159",{ headers: appHeaders });
+              const tokenResponse = await task_page.request.get("https://fuli.gamer.com.tw/ajax/getCSRFToken.php?_=1702883537159");
               const csrfToken = (await tokenResponse.text()).trim();
               try {
                 await task_page.request.post('https://fuli.gamer.com.tw/ajax/finish_ad.php', {
-                  headers: appHeaders,
+                   headers: {
+                     "Content-Type": "application/x-www-form-urlencoded"
+                   },
                   data: "token=" + encodeURIComponent(csrfToken) + "&area=item&sn=" + encodeURIComponent(snValue)
                 });
               } catch (error) {
@@ -132,20 +133,20 @@ var lottery_default = {
               }    
               break;
             }
-
-            await Promise.all([
-             task_page.waitForResponse(/ajax\/check_ad.php/, { timeout: 5e3 }).catch(() => {
-               }),
-              task_page.click("text=看廣告免費兌換").catch(() => {
+          
+           await Promise.all([
+            task_page.waitForResponse(/ajax\/check_ad.php/, { timeout: 5e3 }).catch(() => {
+              }),
+              task_page.click("text=看廣告免費兌換",{ headers: appHeaders }).catch(() => {
               })
-             ]);            
-            await task_page.waitForTimeout(1e3)
+             ]);
+              await task_page.waitForTimeout(1e3)
 
             const final_url = task_page.url();
             if (final_url.includes("/buyD.php") && final_url.includes("ad=1")) {
               logger.log(`正在確認結算頁面`);
               await checkInfo(task_page, logger).catch((...args) => logger.error(...args));
-              await confirm(task_page, logger, recaptcha).catch((...args) => logger.error(...args));
+               await confirm(task_page, logger, recaptcha,{headers: appHeaders }).catch((...args) => logger.error(...args));
               if (await task_page.$(".card > .section > p") && await task_page.$eval(".card > .section > p", (elm) => elm.innerText.includes("成功"))) {
                 logger.success(`已完成一次抽抽樂：${name} \u001b[92m✔\u001b[m`);
                 lottery++;
@@ -231,18 +232,18 @@ async function checkInfo(page, logger) {
   }
 }
 
-async function confirm(page, logger, recaptcha) {
+async function confirm(page, logger, recaptcha,options = {}) {
   try {
     await page.waitForSelector("input[name='agreeConfirm']", { state: "attached" });
     if (await (await page.$("input[name='agreeConfirm']")).getAttribute("checked") === null) {
-      await page.click("text=我已閱讀注意事項，並確認兌換此商品");
+      await page.click("text=我已閱讀注意事項，並確認兌換此商品",options);
     }
     await page.waitForTimeout(100);
     await page.waitForSelector("a:has-text('確認兌換')");
-    await page.click("a:has-text('確認兌換')");
+    await page.click("a:has-text('確認兌換')",options);
     const next_navigation = page.waitForNavigation().catch(() => {});
     await page.waitForSelector("button:has-text('確定')");
-    await page.click("button:has-text('確定')");
+    await page.click("button:has-text('確定')",options);
     await page.waitForTimeout(300);
     if (recaptcha.process === true) {
       const recaptcha_frame_width = await page.$eval("iframe[src^='https://www.google.com/recaptcha/api2/bframe']", (elm) => getComputedStyle(elm).width);
