@@ -100,10 +100,7 @@ var lottery_default = {
                 const response = await task_page.request.get("https://fuli.gamer.com.tw/ajax/check_ad.php?area=item&sn=" + encodeURIComponent(snValue));
                 const data = JSON.parse(await response.text());
                 if (data.data && data.data.finished === 1) {
-                  logger.info("你已經看過或跳過廣告!");
-                  const shopUrl = `https://fuli.gamer.com.tw/shop_detail.php?sn=${snValue}`;
-                  await task_page.goto(shopUrl);
-                  await task_page.waitForLoadState('networkidle',{ timeout: 3e3 });                  
+                  logger.info("你已經看過或跳過廣告!");           
                   break;
                 }
               } catch (e) {
@@ -122,14 +119,16 @@ var lottery_default = {
               } catch (error) {
                 logger.error("發送已看廣告請求時發生錯誤:", error);
                 break;
-              }
-              const shopUrl = `https://fuli.gamer.com.tw/shop_detail.php?sn=${snValue}`;
-              await task_page.goto(shopUrl);
-              await task_page.waitForLoadState('networkidle',{ timeout: 3e3 });         
+              }    
               break;
             }
-            
+
             await task_page.waitForTimeout(1e3);
+            const urlParams = new URLSearchParams(task_page.url().split('?')[1]);
+            const snValue = urlParams.get('sn');
+            const shopUrl = `https://fuli.gamer.com.tw/shop_detail.php?sn=${snValue}`;
+            await task_page.goto(shopUrl);
+            await task_page.waitForLoadState('networkidle',{ timeout: 3e3 });
             await task_page.click("text=看廣告免費兌換");
             await task_page.waitForLoadState('networkidle',{ timeout: 3e3 })
             
