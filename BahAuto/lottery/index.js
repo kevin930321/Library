@@ -101,6 +101,7 @@ var lottery_default = {
                 const data = JSON.parse(await response.text());
                 if (data.data && data.data.finished === 1) {
                   logger.info("你已經看過或跳過廣告!");
+                  await task_page.goto("https://fuli.gamer.com.tw/shop_detail.php?sn=${snValue}");
                   break;
                 }
               } catch (e) {
@@ -123,8 +124,8 @@ var lottery_default = {
               break;
             }
             await task_page.waitForTimeout(1e3);
-//            const urlParams = new URLSearchParams(task_page.url().split('?')[1]);
-//            const snValue = urlParams.get('sn');
+            const urlParams = new URLSearchParams(task_page.url().split('?')[1]);
+            const snValue = urlParams.get('sn');
             const buyDUrl = `https://fuli.gamer.com.tw/buyD.php?ad=1&sn=${snValue}`;
             await task_page.goto(buyDUrl);
             await task_page.waitForLoadState('networkidle',{ timeout: 3e3 })
