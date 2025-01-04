@@ -1,6 +1,17 @@
 import { NotFoundError, solve } from "recaptcha-solver";
 import { Pool } from "@jacoblincool/puddle";
 
+const appHeaders = {
+    "Content-Type": "application/x-www-form-urlencoded",
+    "User-Agent": "Bahadroid (https://www.gamer.com.tw/)",
+    "x-bahamut-app-instanceid": "cc2zQIfDpg4",
+    "X-Bahamut-App-Version": "932",
+    "X-Bahamut-App-Android": "tw.com.gamer.android.activecenter",
+    "Connection": "Keep-Alive",
+    "accept-encoding": "gzip",
+    "cookie": "ckAPP_VCODE=7045"
+  };
+
 var lottery_default = {
   name: "福利社",
   description: "福利社抽獎",
@@ -60,7 +71,7 @@ var lottery_default = {
               let questionButton = await task_page.locator('a[onclick^="showQuestion(1);"]');
               if (await questionButton.isVisible()) {
                 logger.log("需要回答問題，正在回答問題");
-                const tokenResponse = await task_page.request.get("https://fuli.gamer.com.tw/ajax/getCSRFToken.php?_=1702883537159");
+                const tokenResponse = await task_page.request.get("https://fuli.gamer.com.tw/ajax/getCSRFToken.php?_=1702883537159",{ headers: appHeaders });
                 const csrfToken = (await tokenResponse.text()).trim();
                 const templateContent = await task_page.locator("#question-popup").innerHTML();
                 let questionNumbers = [];
@@ -84,7 +95,8 @@ var lottery_default = {
                 });
                 try {
                   await task_page.request.post("https://fuli.gamer.com.tw/ajax/answer_question.php", {
-                    form: formData
+                    form: formData,
+                     headers: appHeaders
                   });
                   await task_page.reload();
                   await task_page.waitForLoadState('networkidle');
@@ -97,7 +109,7 @@ var lottery_default = {
               const snValue = urlParams.get('sn');
               logger.log('sn:', encodeURIComponent(snValue));
               try {
-                const response = await task_page.request.get("https://fuli.gamer.com.tw/ajax/check_ad.php?area=item&sn=" + encodeURIComponent(snValue));
+                const response = await task_page.request.get("https://fuli.gamer.com.tw/ajax/check_ad.php?area=item&sn=" + encodeURIComponent(snValue),{ headers: appHeaders });
                 const data = JSON.parse(await response.text());
                 if (data.data && data.data.finished === 1) {
                   logger.info("你已經看過或跳過廣告!");           
@@ -107,13 +119,11 @@ var lottery_default = {
                 logger.error('解析廣告狀態檢查的請求發生錯誤, 正在重試中:', e);
                 break;
               }
-              const tokenResponse = await task_page.request.get("https://fuli.gamer.com.tw/ajax/getCSRFToken.php?_=1702883537159");
+              const tokenResponse = await task_page.request.get("https://fuli.gamer.com.tw/ajax/getCSRFToken.php?_=1702883537159",{ headers: appHeaders });
               const csrfToken = (await tokenResponse.text()).trim();
               try {
                 await task_page.request.post('https://fuli.gamer.com.tw/ajax/finish_ad.php', {
-                  headers: {
-                    "Content-Type": "application/x-www-form-urlencoded"
-                  },
+                  headers: appHeaders,
                   data: "token=" + encodeURIComponent(csrfToken) + "&area=item&sn=" + encodeURIComponent(snValue)
                 });
               } catch (error) {
