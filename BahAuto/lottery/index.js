@@ -1,17 +1,6 @@
 import { NotFoundError, solve } from "recaptcha-solver";
 import { Pool } from "@jacoblincool/puddle";
 
-const appHeaders = {
-    "Content-Type": "application/x-www-form-urlencoded",
-    "User-Agent": "Bahadroid (https://www.gamer.com.tw/)",
-    "x-bahamut-app-instanceid": "cc2zQIfDpg4",
-    "X-Bahamut-App-Version": "932",
-    "X-Bahamut-App-Android": "tw.com.gamer.android.activecenter",
-    "Connection": "Keep-Alive",
-    "accept-encoding": "gzip",
-    "cookie": "ckAPP_VCODE=7045"
-  };
-
 var lottery_default = {
   name: "福利社",
   description: "福利社抽獎",
@@ -122,9 +111,9 @@ var lottery_default = {
               const csrfToken = (await tokenResponse.text()).trim();
               try {
                 await task_page.request.post('https://fuli.gamer.com.tw/ajax/finish_ad.php', {
-                   headers: {
-                     "Content-Type": "application/x-www-form-urlencoded"
-                   },
+                  headers: {
+                    "Content-Type": "application/x-www-form-urlencoded"
+                  },
                   data: "token=" + encodeURIComponent(csrfToken) + "&area=item&sn=" + encodeURIComponent(snValue)
                 });
               } catch (error) {
@@ -133,20 +122,20 @@ var lottery_default = {
               }    
               break;
             }
-          
-           await Promise.all([
-            task_page.waitForResponse(/ajax\/check_ad.php/, { timeout: 5e3 }).catch(() => {
-              }),
-              task_page.click("text=看廣告免費兌換",{ headers: appHeaders }).catch(() => {
+
+            await Promise.all([
+             task_page.waitForResponse(/ajax\/check_ad.php/, { timeout: 5e3 }).catch(() => {
+               }),
+              task_page.click("text=看廣告免費兌換").catch(() => {
               })
-             ]);
-              await task_page.waitForTimeout(1e3)
+             ]);            
+            await task_page.waitForTimeout(1e3)
 
             const final_url = task_page.url();
             if (final_url.includes("/buyD.php") && final_url.includes("ad=1")) {
               logger.log(`正在確認結算頁面`);
               await checkInfo(task_page, logger).catch((...args) => logger.error(...args));
-               await confirm(task_page, logger, recaptcha,{headers: appHeaders }).catch((...args) => logger.error(...args));
+              await confirm(task_page, logger, recaptcha).catch((...args) => logger.error(...args));
               if (await task_page.$(".card > .section > p") && await task_page.$eval(".card > .section > p", (elm) => elm.innerText.includes("成功"))) {
                 logger.success(`已完成一次抽抽樂：${name} \u001b[92m✔\u001b[m`);
                 lottery++;
@@ -232,18 +221,18 @@ async function checkInfo(page, logger) {
   }
 }
 
-async function confirm(page, logger, recaptcha,options = {}) {
+async function confirm(page, logger, recaptcha) {
   try {
     await page.waitForSelector("input[name='agreeConfirm']", { state: "attached" });
     if (await (await page.$("input[name='agreeConfirm']")).getAttribute("checked") === null) {
-      await page.click("text=我已閱讀注意事項，並確認兌換此商品",options);
+      await page.click("text=我已閱讀注意事項，並確認兌換此商品");
     }
     await page.waitForTimeout(100);
     await page.waitForSelector("a:has-text('確認兌換')");
-    await page.click("a:has-text('確認兌換')",options);
+    await page.click("a:has-text('確認兌換')");
     const next_navigation = page.waitForNavigation().catch(() => {});
     await page.waitForSelector("button:has-text('確定')");
-    await page.click("button:has-text('確定')",options);
+    await page.click("button:has-text('確定')");
     await page.waitForTimeout(300);
     if (recaptcha.process === true) {
       const recaptcha_frame_width = await page.$eval("iframe[src^='https://www.google.com/recaptcha/api2/bframe']", (elm) => getComputedStyle(elm).width);
