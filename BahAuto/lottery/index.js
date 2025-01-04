@@ -101,7 +101,6 @@ var lottery_default = {
                 const data = JSON.parse(await response.text());
                 if (data.data && data.data.finished === 1) {
                   logger.info("你已經看過或跳過廣告!");
-                  await task_page.goto(`https://fuli.gamer.com.tw/shop_detail.php?sn=${snValue}`);
                   break;
                 }
               } catch (e) {
@@ -138,6 +137,10 @@ var lottery_default = {
                 logger.success(`已完成一次抽抽樂：${name} \u001b[92m✔\u001b[m`);
                 lottery++;
               } else {
+                await task_page.request.post('https://fuli.gamer.com.tw/ajax/finish_ad.php', {
+                  headers: {
+                    "Content-Type": "application/x-www-form-urlencoded"
+                  }});
                 logger.error("發生錯誤，重試中 \u001b[91m✘\u001b[m");
               }
             } else {
