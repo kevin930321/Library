@@ -165,7 +165,7 @@ var lottery_default = {
                                 logger.success(`已完成一次抽抽樂：${name} \u001b[92m✔\u001b[m`);
                                 lottery++;
                             } else {
-                   logger.warn(final_url);                                logger.error("發生錯誤，重試中 \u001b[91m✘\u001b[m");
+                                 logger.warn(final_url);                                logger.error("發生錯誤，重試中 \u001b[91m✘\u001b[m");
                             }
                         } else {
                             logger.warn(final_url);
