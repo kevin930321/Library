@@ -24,21 +24,21 @@ var lottery_default = {
     const pool = new Pool(PARRALLEL);
 
     const itemLogger = {
-        log: (...args) => {
-          console.log(args.join(" "));
-        },
-        info: (...args) => {
-          console.log(`\u001b[34m` + args.join(" ") + `\u001b[0m`);
-        },
-        warn: (...args) => {
-          console.log(`\u001b[33m` + args.join(" ") + `\u001b[0m`);
-        },
-        error: (...args) => {
-          console.log(`\u001b[31m` + args.join(" ") + `\u001b[0m`);
-        },
-        success: (...args) => {
-          console.log(`\u001b[32m` + args.join(" ") + `\u001b[0m`);
-        },
+      log: (...args) => {
+        console.log(args.join(" "));
+      },
+      info: (...args) => {
+        console.log(`\u001b[34m` + args.join(" ") + `\u001b[0m`);
+      },
+      warn: (...args) => {
+        console.log(`\u001b[33m` + args.join(" ") + `\u001b[0m`);
+      },
+      error: (...args) => {
+        console.log(`\u001b[31m` + args.join(" ") + `\u001b[0m`);
+      },
+      success: (...args) => {
+        console.log(`\u001b[32m` + args.join(" ") + `\u001b[0m`);
+      },
     };
     for (let i = 0; i < draws.length; i++) {
       pool.push(async () => {
@@ -70,10 +70,10 @@ var lottery_default = {
             if (await task_page.$(".btn-base.c-accent-o.is-disable")) {
               itemLogger.log(`${name} 的廣告免費次數已用完 \u001b[92m✔\u001b[m`);
               delete unfinished[name];
-                console.log("::endgroup::");
+              console.log("::endgroup::");
               break;
             }
-           itemLogger.log(`開始執行`);
+            itemLogger.log(`開始執行`);
             for (let retried = 1; retried <= CHANGING_RETRY; retried++) {
               let adButtonLocator = task_page.locator('a[onclick^="window.FuliAd.checkAd"]');
               if (!(await adButtonLocator.isVisible())) {
@@ -112,7 +112,7 @@ var lottery_default = {
                   await task_page.reload();
                   await task_page.waitForLoadState('networkidle');
                 } catch (error) {
-                 itemLogger.error("post 回答問題時發生錯誤,正在重試中");
+                  itemLogger.error("post 回答問題時發生錯誤,正在重試中");
                   break;
                 }
               }
@@ -124,10 +124,10 @@ var lottery_default = {
                 const data = JSON.parse(await response.text());
                 if (data.data && data.data.finished === 1) {
                   itemLogger.info("廣告已跳過");
-                   break;
+                  break;
                 }
               } catch (e) {
-               itemLogger.error('解析廣告狀態檢查的請求發生錯誤, 正在重試中:', e);
+                itemLogger.error('解析廣告狀態檢查的請求發生錯誤, 正在重試中:', e);
                 break;
               }
               const tokenResponse = await task_page.request.get("https://fuli.gamer.com.tw/ajax/getCSRFToken.php?_=1702883537159");
@@ -140,31 +140,31 @@ var lottery_default = {
                   data: "token=" + encodeURIComponent(csrfToken) + "&area=item&sn=" + encodeURIComponent(snValue)
                 });
               } catch (error) {
-               itemLogger.error("發送已看廣告請求時發生錯誤:", error);
+                itemLogger.error("發送已看廣告請求時發生錯誤:", error);
                 break;
               }
-             break;
+              break;
             }
             await Promise.all([
-              task_page.waitForResponse(/ajax\/check_ad.php/, { timeout: 5e3 }).catch(() => {}),
-             task_page.click("text=看廣告免費兌換").catch(() => {})
+              task_page.waitForResponse(/ajax\/check_ad.php/, { timeout: 5e3 }).catch(() => { }),
+              task_page.click("text=看廣告免費兌換").catch(() => { })
             ]);
             await task_page.waitForTimeout(1e3);
             const final_url = task_page.url();
             if (final_url.includes("/buyD.php") && final_url.includes("ad=1")) {
-                itemLogger.log(`正在確認結算頁面`);
-                await checkInfo(task_page, itemLogger).catch((...args) => itemLogger.error(...args));
-                await confirm(task_page, itemLogger, recaptcha).catch((...args) => itemLogger.error(...args));
+              itemLogger.log(`正在確認結算頁面`);
+              await checkInfo(task_page, itemLogger).catch((...args) => itemLogger.error(...args));
+              await confirm(task_page, itemLogger, recaptcha).catch((...args) => itemLogger.error(...args));
               if (await task_page.$(".card > .section > p") && await task_page.$eval(".card > .section > p", (elm) => elm.innerText.includes("成功"))) {
-               itemLogger.success(`已完成一次抽抽樂：${name} \u001b[92m✔\u001b[m`);
+                itemLogger.success(`已完成一次抽抽樂：${name} \u001b[92m✔\u001b[m`);
                 lottery++;
               } else {
                 itemLogger.warn(final_url);
-               itemLogger.error("發生錯誤，重試中 \u001b[91m✘\u001b[m");
+                itemLogger.error("發生錯誤，重試中 \u001b[91m✘\u001b[m");
               }
             } else {
-               itemLogger.warn(final_url);
-               itemLogger.error("未進入結算頁面，重試中 \u001b[91m✘\u001b[m");
+              itemLogger.warn(final_url);
+              itemLogger.error("未進入結算頁面，重試中 \u001b[91m✘\u001b[m");
             }
           } catch (err) {
             itemLogger.error("!", err);
@@ -252,7 +252,7 @@ async function confirm(page, itemLogger, recaptcha) {
     await page.waitForTimeout(100);
     await page.waitForSelector("a:has-text('確認兌換')");
     await page.click("a:has-text('確認兌換')");
-    const next_navigation = page.waitForNavigation().catch(() => {});
+    const next_navigation = page.waitForNavigation().catch(() => { });
     await page.waitForSelector("button:has-text('確定')");
     await page.click("button:has-text('確定')");
     await page.waitForTimeout(300);
@@ -264,7 +264,7 @@ async function confirm(page, itemLogger, recaptcha) {
           await timeout_promise(solve(page, { delay: 64 }), 3e4);
         } catch (err) {
           if (err instanceof NotFoundError) {
-           itemLogger.error("reCAPTCHA [Try it later]");
+            itemLogger.error("reCAPTCHA [Try it later]");
           }
           throw err;
         }
@@ -273,8 +273,8 @@ async function confirm(page, itemLogger, recaptcha) {
     }
     await next_navigation;
   } catch (err) {
-   itemLogger.error(page.url());
-   itemLogger.error(err);
+    itemLogger.error(page.url());
+    itemLogger.error(err);
   }
 }
 
