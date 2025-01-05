@@ -22,10 +22,29 @@ var lottery_default = {
     const CHANGING_RETRY = +params.changing_retry || +shared.changing_retry || 3;
     const context = page.context();
     const pool = new Pool(PARRALLEL);
+
+    const itemLogger = {
+        log: (...args) => {
+          console.log(args.join(" "));
+        },
+        info: (...args) => {
+          console.log(`\u001b[34m` + args.join(" ") + `\u001b[0m`);
+        },
+        warn: (...args) => {
+          console.log(`\u001b[33m` + args.join(" ") + `\u001b[0m`);
+        },
+        error: (...args) => {
+          console.log(`\u001b[31m` + args.join(" ") + `\u001b[0m`);
+        },
+        success: (...args) => {
+          console.log(`\u001b[32m` + args.join(" ") + `\u001b[0m`);
+        },
+    };
     for (let i = 0; i < draws.length; i++) {
       pool.push(async () => {
         const idx = i;
         const { link, name } = draws[idx];
+
         const task_page = await context.newPage();
         const recaptcha = { process: false };
         task_page.on("response", async (response) => {
@@ -40,27 +59,30 @@ var lottery_default = {
             recaptcha.process = data[5] !== "nocaptcha";
           }
         });
+
+
         for (let attempts = 1; attempts <= MAX_ATTEMPTS; attempts++) {
-          logger.log(`::group:: ${name} - 第 ${attempts} 次嘗試`);
+          console.log(`::group:: [${idx + 1} / ${draws.length}] ${name} (Attempt ${attempts})`);
           try {
             await task_page.goto(link);
             await task_page.waitForSelector("#BH-master > .BH-lbox.fuli-pbox h1");
             await task_page.waitForTimeout(100);
             if (await task_page.$(".btn-base.c-accent-o.is-disable")) {
-              logger.log(`${name} 的廣告免費次數已用完 \u001b[92m✔\u001b[m`);
+              itemLogger.log(`${name} 的廣告免費次數已用完 \u001b[92m✔\u001b[m`);
               delete unfinished[name];
+                console.log("::endgroup::");
               break;
             }
-            logger.log(`[${idx + 1} / ${draws.length}] (${attempts}) ${name}`);
+           itemLogger.log(`開始執行`);
             for (let retried = 1; retried <= CHANGING_RETRY; retried++) {
               let adButtonLocator = task_page.locator('a[onclick^="window.FuliAd.checkAd"]');
               if (!(await adButtonLocator.isVisible())) {
-                logger.warn('沒有發現廣告兌換按鈕, 可能為商品次數用盡或是已過期。');
+                itemLogger.warn('沒有發現廣告兌換按鈕, 可能為商品次數用盡或是已過期。');
                 break;
               }
               let questionButton = await task_page.locator('a[onclick^="showQuestion(1);"]');
               if (await questionButton.isVisible()) {
-                logger.log("需要回答問題，正在回答問題");
+                itemLogger.log("需要回答問題，正在回答問題");
                 const tokenResponse = await task_page.request.get("https://fuli.gamer.com.tw/ajax/getCSRFToken.php?_=1702883537159");
                 const csrfToken = (await tokenResponse.text()).trim();
                 const templateContent = await task_page.locator("#question-popup").innerHTML();
@@ -90,22 +112,22 @@ var lottery_default = {
                   await task_page.reload();
                   await task_page.waitForLoadState('networkidle');
                 } catch (error) {
-                  logger.error("post 回答問題時發生錯誤,正在重試中");
+                 itemLogger.error("post 回答問題時發生錯誤,正在重試中");
                   break;
                 }
               }
               const urlParams = new URLSearchParams(task_page.url().split('?')[1]);
               const snValue = urlParams.get('sn');
-              logger.log('sn:', encodeURIComponent(snValue));
+              itemLogger.log('sn:', encodeURIComponent(snValue));
               try {
                 const response = await task_page.request.get("https://fuli.gamer.com.tw/ajax/check_ad.php?area=item&sn=" + encodeURIComponent(snValue));
                 const data = JSON.parse(await response.text());
                 if (data.data && data.data.finished === 1) {
-                  logger.info("廣告已跳過");           
-                  break;
+                  itemLogger.info("廣告已跳過");
+                   break;
                 }
               } catch (e) {
-                logger.error('解析廣告狀態檢查的請求發生錯誤, 正在重試中:', e);
+               itemLogger.error('解析廣告狀態檢查的請求發生錯誤, 正在重試中:', e);
                 break;
               }
               const tokenResponse = await task_page.request.get("https://fuli.gamer.com.tw/ajax/getCSRFToken.php?_=1702883537159");
@@ -118,38 +140,37 @@ var lottery_default = {
                   data: "token=" + encodeURIComponent(csrfToken) + "&area=item&sn=" + encodeURIComponent(snValue)
                 });
               } catch (error) {
-                logger.error("發送已看廣告請求時發生錯誤:", error);
+               itemLogger.error("發送已看廣告請求時發生錯誤:", error);
                 break;
-              }    
-              break;
+              }
+             break;
             }
-
             await Promise.all([
               task_page.waitForResponse(/ajax\/check_ad.php/, { timeout: 5e3 }).catch(() => {}),
-              task_page.click("text=看廣告免費兌換").catch(() => {})
-            ]);            
-            await task_page.waitForTimeout(1e3)
-
+             task_page.click("text=看廣告免費兌換").catch(() => {})
+            ]);
+            await task_page.waitForTimeout(1e3);
             const final_url = task_page.url();
             if (final_url.includes("/buyD.php") && final_url.includes("ad=1")) {
-              logger.log(`正在確認結算頁面`);
-              await checkInfo(task_page, logger).catch((...args) => logger.error(...args));
-              await confirm(task_page, logger, recaptcha).catch((...args) => logger.error(...args));
+                itemLogger.log(`正在確認結算頁面`);
+                await checkInfo(task_page, itemLogger).catch((...args) => itemLogger.error(...args));
+                await confirm(task_page, itemLogger, recaptcha).catch((...args) => itemLogger.error(...args));
               if (await task_page.$(".card > .section > p") && await task_page.$eval(".card > .section > p", (elm) => elm.innerText.includes("成功"))) {
-                logger.success(`已完成一次抽抽樂：${name} \u001b[92m✔\u001b[m`);
+               itemLogger.success(`已完成一次抽抽樂：${name} \u001b[92m✔\u001b[m`);
                 lottery++;
               } else {
-                logger.warn(final_url);
-                logger.error("發生錯誤，重試中 \u001b[91m✘\u001b[m");
+                itemLogger.warn(final_url);
+               itemLogger.error("發生錯誤，重試中 \u001b[91m✘\u001b[m");
               }
             } else {
-              logger.warn(final_url);
-              logger.error("未進入結算頁面，重試中 \u001b[91m✘\u001b[m");
+               itemLogger.warn(final_url);
+               itemLogger.error("未進入結算頁面，重試中 \u001b[91m✘\u001b[m");
             }
           } catch (err) {
-            logger.error("!", err);
+            itemLogger.error("!", err);
+          } finally {
+            console.log("::endgroup::");
           }
-          logger.log("::endgroup::");
         }
         await task_page.close();
       });
@@ -161,7 +182,7 @@ var lottery_default = {
       shared.report.reports["福利社抽獎"] = report({ lottery, unfinished });
     }
     return { lottery, unfinished };
-  }
+  },
 };
 
 async function getList(page, logger) {
@@ -203,26 +224,26 @@ async function getList(page, logger) {
   return draws;
 }
 
-async function checkInfo(page, logger) {
+async function checkInfo(page, itemLogger) {
   try {
     const name = await page.$eval("#name", (elm) => elm.value);
     const tel = await page.$eval("#tel", (elm) => elm.value);
     const city = await page.$eval("[name=city]", (elm) => elm.value);
     const country = await page.$eval("[name=country]", (elm) => elm.value);
     const address = await page.$eval("#address", (elm) => elm.value);
-    if (!name) logger.log("無收件人姓名");
-    if (!tel) logger.log("無收件人電話");
-    if (!city) logger.log("無收件人城市");
-    if (!country) logger.log("無收件人區域");
-    if (!address) logger.log("無收件人地址");
+    if (!name) itemLogger.log("無收件人姓名");
+    if (!tel) itemLogger.log("無收件人電話");
+    if (!city) itemLogger.log("無收件人城市");
+    if (!country) itemLogger.log("無收件人區域");
+    if (!address) itemLogger.log("無收件人地址");
     if (!name || !tel || !city || !country || !address)
       throw new Error("警告：收件人資料不全");
   } catch (err) {
-    logger.error(err);
+    itemLogger.error(err);
   }
 }
 
-async function confirm(page, logger, recaptcha) {
+async function confirm(page, itemLogger, recaptcha) {
   try {
     await page.waitForSelector("input[name='agreeConfirm']", { state: "attached" });
     if (await (await page.$("input[name='agreeConfirm']")).getAttribute("checked") === null) {
@@ -238,22 +259,22 @@ async function confirm(page, logger, recaptcha) {
     if (recaptcha.process === true) {
       const recaptcha_frame_width = await page.$eval("iframe[src^='https://www.google.com/recaptcha/api2/bframe']", (elm) => getComputedStyle(elm).width);
       if (recaptcha_frame_width !== "100%") {
-        logger.log("需要處理 reCAPTCHA");
+        itemLogger.log("需要處理 reCAPTCHA");
         try {
           await timeout_promise(solve(page, { delay: 64 }), 3e4);
         } catch (err) {
           if (err instanceof NotFoundError) {
-            logger.error("reCAPTCHA [Try it later]");
+           itemLogger.error("reCAPTCHA [Try it later]");
           }
           throw err;
         }
-        logger.log("reCAPTCHA 自動處理完成");
+        itemLogger.log("reCAPTCHA 自動處理完成");
       }
     }
     await next_navigation;
   } catch (err) {
-    logger.error(page.url());
-    logger.error(err);
+   itemLogger.error(page.url());
+   itemLogger.error(err);
   }
 }
 
