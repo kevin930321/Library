@@ -27,14 +27,6 @@ var lottery_default = {
         const idx = i;
         const { link, name } = draws[idx];
         const task_page = await context.newPage();
-
-        // 在這裡加入程式碼將 navigator.webdriver 設定為 undefined
-        await task_page.evaluate(() => {
-          Object.defineProperty(navigator, 'webdriver', {
-            get: () => undefined,
-          });
-        });
-       
         const recaptcha = { process: false };
         task_page.on("response", async (response) => {
           if (response.url().includes("recaptcha/api2/userverify")) {
