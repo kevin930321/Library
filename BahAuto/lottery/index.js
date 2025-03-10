@@ -1,6 +1,8 @@
 import { NotFoundError, solve } from "recaptcha-solver";
 import { Pool } from "@jacoblincool/puddle";
 
+process.env.DISPLAY = ':0';
+
 var lottery_default = {
   name: "福利社",
   description: "福利社抽獎",
