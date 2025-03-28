@@ -18,7 +18,7 @@ var lottery_default = {
       unfinished[name] = link;
     });
     const PARRALLEL = +params.max_parallel || 1;
-    const MAX_ATTEMPTS = +params.max_attempts || +shared.max_attempts || 20;
+    const MAX_ATTEMPTS = +params.max_attempts || +shared.max_attempts || 3; // Reduced attempts for faster feedback during testing
     const CHANGING_RETRY = +params.changing_retry || +shared.changing_retry || 3;
     const context = page.context();
     const pool = new Pool(PARRALLEL);
@@ -32,11 +32,10 @@ var lottery_default = {
 
           await task_page.addInitScript(() => {
             Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-            Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3] }); // Simple fake plugins
-            Object.defineProperty(navigator, 'languages', { get: () => ['zh-TW', 'zh'] }); // Fake languages
+            Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3] });
+            Object.defineProperty(navigator, 'languages', { get: () => ['zh-TW', 'zh'] });
             if (window.chrome) {
-              // delete window.chrome; // Potentially breaking, test carefully
-              window.chrome = { runtime: {}, loadTimes: () => {}, csi: () => {} }; // Minimal fake chrome object
+              window.chrome = { runtime: {}, loadTimes: () => {}, csi: () => {} };
             }
           });
 
@@ -63,29 +62,41 @@ var lottery_default = {
           let attempt_success = false;
           for (let attempts = 1; attempts <= MAX_ATTEMPTS; attempts++) {
             try {
+              logger.log(`[${idx + 1} / ${draws.length}] (${attempts}/${MAX_ATTEMPTS}) ${name} - 載入頁面: ${link}`);
               await task_page.goto(link, { waitUntil: 'domcontentloaded', timeout: 60000 });
               await task_page.locator("#BH-master > .BH-lbox.fuli-pbox h1").waitFor({ state: 'visible', timeout: 30000 });
-              await task_page.waitForTimeout(500);
+              await task_page.waitForTimeout(500 + Math.random()*500);
 
               const disableButton = task_page.locator(".btn-base.c-accent-o.is-disable");
               if (await disableButton.isVisible({ timeout: 5000 })) {
-                logger.log(`${name} 的廣告免費次數已用完 \u001b[92m✔\u001b[m`);
+                logger.log(`[${idx + 1}] ${name} 的廣告免費次數已用完或已兌換 \u001b[92m✔\u001b[m`);
                 delete unfinished[name];
                 attempt_success = true;
                 break;
               }
-              logger.log(`[${idx + 1} / ${draws.length}] (${attempts}/${MAX_ATTEMPTS}) ${name}`);
+              logger.log(`[${idx + 1}] (${attempts}/${MAX_ATTEMPTS}) ${name}`);
 
               const questionButton = task_page.locator('a[onclick^="showQuestion(1);"]');
               if (await questionButton.isVisible({ timeout: 5000 })) {
-                 logger.log("需要回答問題，正在回答問題");
+                 logger.log(`[${idx + 1}] 需要回答問題，正在處理...`);
                  try {
                    const timestamp = Date.now();
-                   const tokenResponse = await task_page.request.get(`https://fuli.gamer.com.tw/ajax/getCSRFToken.php?_=${timestamp}`, {
-                     headers: { 'Referer': task_page.url(), 'X-Requested-With': 'XMLHttpRequest' }
+                   const tokenUrl = `https://fuli.gamer.com.tw/ajax/getCSRFToken.php?_=${timestamp}`;
+                   logger.log(`[${idx + 1}] 正在獲取 CSRF Token: ${tokenUrl}`);
+                   const tokenResponse = await task_page.request.get(tokenUrl, {
+                     headers: { 'Referer': task_page.url() } // Removed X-Requested-With
                    });
+
+                   if (!tokenResponse.ok()) {
+                       throw new Error(`獲取 CSRF Token 請求失敗, 狀態碼: ${tokenResponse.status()} at ${tokenUrl}`);
+                   }
+
                    const csrfToken = (await tokenResponse.text()).trim();
-                   if (!csrfToken) throw new Error('未能獲取 CSRF Token');
+                   if (!csrfToken) {
+                       logger.error(`[${idx + 1}] 從伺服器獲取的 CSRF Token 為空.`);
+                       throw new Error('未能獲取 CSRF Token (回應為空)');
+                   }
+                   logger.log(`[${idx + 1}] 成功獲取 CSRF Token`);
 
                    const templateContent = await task_page.locator("#question-popup").innerHTML({ timeout: 10000 });
                    let questionNumbers = [];
@@ -94,12 +105,18 @@ var lottery_default = {
                    while ((match = regex.exec(templateContent)) !== null) {
                      questionNumbers.push(match[1]);
                    }
+                   if (questionNumbers.length === 0) {
+                       throw new Error("找到了問題區塊，但未能解析出問題編號");
+                   }
+                   logger.log(`[${idx + 1}] 找到 ${questionNumbers.length} 個問題`);
+
                    let answers = [];
                    for (let question of questionNumbers) {
                      const answer = await task_page.locator(`.fuli-option[data-question="${question}"]`).getAttribute("data-answer", { timeout: 5000 });
                      if (answer === null) throw new Error(`找不到問題 ${question} 的答案屬性`);
                      answers.push(answer);
                    }
+
                    let formData = {};
                    const urlParams = new URLSearchParams(task_page.url().split('?')[1]);
                    let snValue = urlParams.get('sn');
@@ -110,7 +127,8 @@ var lottery_default = {
                      formData[`answer[${index}]`] = ans;
                    });
 
-                    const answerPostResponse = await task_page.request.post("https://fuli.gamer.com.tw/ajax/answer_question.php", {
+                   logger.log(`[${idx + 1}] 正在提交問題答案...`);
+                   const answerPostResponse = await task_page.request.post("https://fuli.gamer.com.tw/ajax/answer_question.php", {
                        headers: {
                          'Referer': task_page.url(),
                          'X-Requested-With': 'XMLHttpRequest',
@@ -124,90 +142,125 @@ var lottery_default = {
                     if(answerJson.error) {
                         throw new Error(`回答問題API回傳錯誤: ${answerJson.error.message || JSON.stringify(answerJson.error)}`);
                     }
-                    logger.log("問題回答請求已發送，正在重新載入頁面");
+                    logger.log(`[${idx + 1}] 問題回答成功，正在重新載入頁面`);
                     await task_page.reload({ waitUntil: 'networkidle', timeout: 60000 });
                  } catch(questionError) {
-                   logger.error(`處理問題時出錯: ${questionError.message}, 該次嘗試失敗，重試中...`);
+                   logger.error(`[${idx + 1}] 處理問題時出錯: ${questionError.message}, 該次嘗試失敗，重試中...`);
+                   await task_page.screenshot({ path: `error_question_${idx + 1}_${name}_${attempts}.png` }).catch(e=>logger.error(`截圖失敗: ${e}`));
                    await task_page.waitForTimeout(3000 + Math.random() * 2000);
                    continue;
                  }
+              } else {
+                 logger.log(`[${idx + 1}] 未找到需要回答的問題按鈕`);
               }
 
 
-              logger.log("嘗試點擊兌換按鈕並等待跳轉至結算頁面...");
-              const exchangeButtonLocator = task_page.locator('a:has-text("看廣告免費兌換"), a:has-text("我要兌換")');
-              await exchangeButtonLocator.waitFor({ state: 'visible', timeout: 15000 });
+              logger.log(`[${idx + 1}] 正在尋找 '看廣告免費兌換' 按鈕...`);
+              // --- MODIFIED LOCATOR STRATEGY ---
+              const adExchangeButtonLocator = task_page.locator('a.btn-base.c-accent-o:has-text("看廣告免費兌換")');
 
               try {
+                  await adExchangeButtonLocator.waitFor({ state: 'visible', timeout: 15000 });
+                  logger.log(`[${idx + 1}] 找到並準備點擊 '看廣告免費兌換' 按鈕`);
+              } catch (e) {
+                   logger.error(`[${idx + 1}] (${attempts}/${MAX_ATTEMPTS}) ${name} - 等待 '看廣告免費兌換' 按鈕超時或失敗: ${e.message}. 可能已兌換、無廣告次數或頁面結構改變.`);
+                    // Check if the normal exchange button exists as a fallback indicator, but don't click it
+                    const normalExchangeButton = task_page.locator('a.btn-base.c-primary:has-text("我要兌換")');
+                    if(await normalExchangeButton.isVisible({ timeout: 1000 })) {
+                        logger.warn(`[${idx + 1}] 注意: 雖然找不到廣告兌換按鈕, 但找到了 '我要兌換' 按鈕. 可能僅剩巴幣兌換選項.`);
+                    }
+                    // Also check if the disabled button now appeared
+                    if (await disableButton.isVisible({ timeout: 1000 })) {
+                        logger.log(`[${idx + 1}] '看廣告免費兌換' 按鈕消失, 但找到了禁用按鈕. 可能剛好在此期間次數用盡.`);
+                        delete unfinished[name];
+                        attempt_success = true;
+                        break; // Exit attempt loop for this item
+                    }
+                   await task_page.screenshot({ path: `error_find_adbutton_${idx + 1}_${name}_${attempts}.png` }).catch(err=>logger.error(`截圖失敗: ${err}`));
+                   throw new Error(`未能找到 '看廣告免費兌換' 按鈕`); // Propagate error to retry
+              }
+
+              try {
+                  logger.log(`[${idx + 1}] 點擊按鈕並等待導航至結算頁面...`);
                   await Promise.all([
                       task_page.waitForURL(/\/buyD\.php\?sn=\d+(?:&ad=1)?(?:&exchange=true)?/, { timeout: 45000, waitUntil: 'domcontentloaded' }),
-                      exchangeButtonLocator.click({timeout: 15000}),
+                      adExchangeButtonLocator.click({ timeout: 15000 }),
                   ]);
-                  logger.log(`成功導航到結算頁面: ${task_page.url()}`);
+                  logger.log(`[${idx + 1}] 成功導航到結算頁面: ${task_page.url()}`);
                   await task_page.waitForLoadState('networkidle', { timeout: 25000 });
               } catch (navError) {
-                 logger.error(`點擊兌換按鈕後導航失敗或超時: ${navError}. 當前 URL: ${task_page.url()}. 該次嘗試失敗，重試中...`);
-                 await task_page.screenshot({ path: `error_nav_${name}_${attempts}.png`, fullPage: true }).catch(e=>logger.error(`截圖失敗: ${e}`));
+                 logger.error(`[${idx + 1}] (${attempts}/${MAX_ATTEMPTS}) 點擊兌換按鈕後導航失敗或超時: ${navError}. 當前 URL: ${task_page.url()}. 該次嘗試失敗，重試中...`);
+                 await task_page.screenshot({ path: `error_nav_${idx + 1}_${name}_${attempts}.png` }).catch(e=>logger.error(`截圖失敗: ${e}`));
                  await task_page.waitForTimeout(3000 + Math.random() * 2000);
                  continue;
               }
 
               const final_url = task_page.url();
               if (final_url.includes("/buyD.php")) {
-                 logger.log(`正在確認結算頁面`);
+                 logger.log(`[${idx + 1}] 正在確認結算頁面資料`);
                  await checkInfo(task_page, logger);
+                 logger.log(`[${idx + 1}] 正在執行結算確認步驟`);
                  await confirm(task_page, logger, recaptcha);
 
                  const successMessageLocator = task_page.locator(".card > .section > p:text-matches('成功')");
-
                  try {
                     await successMessageLocator.waitFor({ state: 'visible', timeout: 15000 });
-                    logger.success(`已完成一次抽抽樂：${name} \u001b[92m✔\u001b[m`);
+                    logger.success(`[${idx + 1}] 已完成一次抽抽樂：${name} \u001b[92m✔\u001b[m`);
                     lottery++;
                     delete unfinished[name];
                     attempt_success = true;
-                    break;
+                    break; // Success, break attempt loop
                  } catch (e) {
-                    logger.warn(`結算頁面未找到成功訊息或超時. URL: ${final_url}`);
+                    logger.warn(`[${idx + 1}] (${attempts}/${MAX_ATTEMPTS}) 結算頁面未找到成功訊息或超時. URL: ${final_url}`);
                     const errorSection = task_page.locator(".card > .section");
                     const errorMessage = await errorSection.textContent({ timeout: 5000 }).catch(() => "無法獲取結算區塊內容");
-                    logger.error(`錯誤或非預期結算頁面內容: ${errorMessage.trim()}. 該次嘗試失敗，重試中... \u001b[91m✘\u001b[m`);
-                    await task_page.screenshot({ path: `error_confirm_${name}_${attempts}.png`, fullPage: true }).catch(e=>logger.error(`截圖失敗: ${e}`));
+                    logger.error(`[${idx + 1}] 錯誤或非預期結算頁面內容: ${errorMessage.trim()}. 該次嘗試失敗，重試中... \u001b[91m✘\u001b[m`);
+                    await task_page.screenshot({ path: `error_confirm_${idx + 1}_${name}_${attempts}.png` }).catch(e=>logger.error(`截圖失敗: ${e}`));
                     await task_page.waitForTimeout(3000 + Math.random() * 2000);
-                    continue;
+                    continue; // Try confirm again in next attempt
                  }
               } else {
-                logger.warn(`未導航至預期的結算頁面. 實際 URL: ${final_url}`);
+                logger.warn(`[${idx + 1}] (${attempts}/${MAX_ATTEMPTS}) 未導航至預期的結算頁面. 實際 URL: ${final_url}`);
                 logger.error("未進入結算頁面，重試中 \u001b[91m✘\u001b[m");
-                 await task_page.screenshot({ path: `error_wrongpage_${name}_${attempts}.png`, fullPage: true }).catch(e=>logger.error(`截圖失敗: ${e}`));
+                await task_page.screenshot({ path: `error_wrongpage_${idx + 1}_${name}_${attempts}.png` }).catch(e=>logger.error(`截圖失敗: ${e}`));
                 await task_page.waitForTimeout(3000 + Math.random() * 2000);
-                continue;
+                continue; // Retry page load in next attempt
               }
             } catch (err) {
-              logger.error(`處理 "${name}" 抽獎時內部循環發生錯誤 (Attempt ${attempts}/${MAX_ATTEMPTS}): ${err.message}. Stack: ${err.stack}`);
-              if (task_page.isClosed()) {
-                  logger.error('頁面已關閉，無法繼續此任務');
-                  break;
+              logger.error(`[${idx + 1}] (${attempts}/${MAX_ATTEMPTS}) 處理 "${name}" 抽獎時內部循環發生錯誤: ${err.message}. Stack: ${err.stack}`);
+              if (!task_page || task_page.isClosed()) {
+                  logger.error(`[${idx + 1}] 頁面已關閉，無法繼續此任務`);
+                  break; // Break attempt loop if page closed
               }
-               await task_page.screenshot({ path: `error_loop_${name}_${attempts}.png`, fullPage: true }).catch(e=>logger.error(`截圖失敗: ${e}`));
-              await task_page.waitForTimeout(5000 + Math.random() * 3000);
+               await task_page.screenshot({ path: `error_loop_${idx + 1}_${name}_${attempts}.png` }).catch(e=>logger.error(`截圖失敗: ${e}`));
+               if (attempts >= MAX_ATTEMPTS) {
+                   logger.error(`[${idx + 1}] "${name}" 在第 ${attempts} 次嘗試中發生錯誤且已達最大嘗試次數`);
+               } else {
+                    logger.log(`[${idx + 1}] 等待後重試...`);
+                    await task_page.waitForTimeout(5000 + Math.random() * 3000);
+               }
             }
-          }
+          } // End of attempts loop
+
           if (!attempt_success && unfinished[name]) {
-             logger.error(`"${name}" 經過 ${MAX_ATTEMPTS} 次嘗試後仍未完成 \u001b[91m✘\u001b[m`);
+             logger.error(`[${idx + 1}] "${name}" 經過 ${MAX_ATTEMPTS} 次嘗試後仍未完成 \u001b[91m✘\u001b[m`);
           }
         } catch (outerError) {
-             logger.error(`處理 "${name}" 任務時發生嚴重錯誤: ${outerError.message}. Stack: ${outerError.stack}`);
+             logger.error(`[${idx + 1}] 處理 "${name}" 任務時發生嚴重錯誤: ${outerError.message}. Stack: ${outerError.stack}`);
              if (task_page && !task_page.isClosed()) {
-                await task_page.screenshot({ path: `error_fatal_${name}.png`, fullPage: true }).catch(e=>logger.error(`截圖失敗: ${e}`));
+                await task_page.screenshot({ path: `error_fatal_${idx+1}_${name}.png` }).catch(e=>logger.error(`截圖失敗: ${e}`));
              }
         } finally {
             if (task_page && !task_page.isClosed()) {
+                 logger.log(`[${idx + 1}] 關閉頁面: ${name}`)
                  await task_page.close();
+            } else {
+                logger.log(`[${idx + 1}] 頁面無需關閉: ${name}`)
             }
         }
-      });
-    }
+      }); // End of pool.push
+    } // End of draw items loop
+
     await pool.go();
     await page.waitForTimeout(2e3);
     logger.log(`執行完畢 ✨`);
@@ -246,16 +299,18 @@ async function getList(page, logger) {
         for (let itemHandle of items) {
           try {
             const itemHTML = await itemHandle.innerHTML();
-            if (itemHTML.includes("抽抽樂") || itemHTML.includes("抽獎")) { // Relax condition slightly
+            if (itemHTML.includes("抽抽樂") || itemHTML.includes("抽獎")) {
               const nameElement = await itemHandle.$(".items-title");
               const link = await itemHandle.getAttribute('href');
               if (nameElement && link && link.includes("detail.php")) {
                   const name = await nameElement.textContent();
-                  draws.push({ name: name.trim(), link: new URL(link, page.url()).href }); // Store absolute URL
+                  const absoluteLink = new URL(link, page.url()).href; // Ensure absolute URL
+                  logger.log(` - 找到抽獎: ${name.trim()}, Link: ${absoluteLink}`);
+                  draws.push({ name: name.trim(), link: absoluteLink });
               }
             }
           } finally {
-              await itemHandle.dispose();
+              await itemHandle.dispose(); // Dispose handle to free memory
           }
         }
 
@@ -264,6 +319,7 @@ async function getList(page, logger) {
            const nextPageNumStr = await nextPageButton.textContent();
            const nextPageNum = parseInt(nextPageNumStr, 10);
            if (!isNaN(nextPageNum) && nextPageNum > currentPageNum) {
+               logger.log(`準備前往下一頁: ${nextPageNum}`);
                currentPageNum = nextPageNum;
                await page.waitForTimeout(500 + Math.random()*500);
            } else {
@@ -275,7 +331,7 @@ async function getList(page, logger) {
            break;
         }
       }
-      break;
+      break; // Success getting list, break retry loop
     } catch (err) {
       logger.error(`讀取商店列表第 ${currentPageNum} 頁失敗 (嘗試次數 ${3 - attempts}/3): ${err.message}`);
        if (page && !page.isClosed()) {
@@ -302,30 +358,39 @@ async function checkInfo(page, logger) {
       { selector: "#address", name: "收件人地址" }
     ];
     let missingInfo = false;
+    logger.log("檢查收件人資訊欄位是否存在...");
     await page.locator(requiredFields[0].selector).waitFor({ state: 'attached', timeout: 15000 });
 
     for (const field of requiredFields) {
         const element = page.locator(field.selector);
-        let value;
-        if (field.name.includes('城市') || field.name.includes('區域')) {
-             value = await element.inputValue({ timeout: 5000 }); // Dropdowns use value
-        } else {
-            value = await element.inputValue({ timeout: 5000 }); // Inputs use value
-        }
-
-        if (!value || value.trim() === '' || value === '0') {
-            logger.warn(`警告：缺少 ${field.name}`);
-            missingInfo = true;
+        let value = '';
+        try {
+            if (await element.evaluate(el => el.tagName.toLowerCase() === 'select')) {
+                 value = await element.inputValue({ timeout: 5000 }); // For select dropdown
+                 if(value === '0' || value === ''){
+                      logger.warn(`警告：${field.name} 未選擇 (值: ${value})`);
+                      missingInfo = true;
+                 }
+            } else {
+                value = await element.inputValue({ timeout: 5000 }); // For input fields
+                if (!value || value.trim() === '') {
+                    logger.warn(`警告：缺少 ${field.name}`);
+                    missingInfo = true;
+                }
+            }
+        } catch (e) {
+            logger.error(`檢查欄位 ${field.name} (${field.selector}) 時發生錯誤: ${e.message}`);
+            missingInfo = true; // Assume missing if check fails
         }
     }
     if (missingInfo) {
       logger.error("錯誤：收件人資料不全，無法完成兌換");
       throw new Error("收件人資料不全");
     }
-     logger.log("收件人資料檢查完成");
+     logger.log("收件人資料檢查完成，資料完整");
   } catch (err) {
      logger.error(`檢查收件人資料時出錯: ${err.message}`);
-     throw err;
+     throw err; // Re-throw to stop confirmation
   }
 }
 
@@ -336,15 +401,19 @@ async function confirm(page, logger, recaptcha) {
     if (!await agreeCheckbox.isChecked()) {
        logger.log("勾選同意條款");
        await agreeCheckbox.check({ force: true, timeout: 5000 });
+    } else {
+        logger.log("同意條款已勾選");
     }
 
     await page.waitForTimeout(200 + Math.random()*300);
     const confirmButton1 = page.locator("a:has-text('確認兌換')");
     await confirmButton1.waitFor({ state: "visible", timeout: 10000 });
+    logger.log("點擊 '確認兌換' 按鈕");
     await confirmButton1.click({ timeout: 10000 });
 
     const confirmDialogButton = page.locator(".popup-msg .btn-primary:has-text('確定')");
     await confirmDialogButton.waitFor({ state: "visible", timeout: 10000 });
+    logger.log("點擊彈出視窗的 '確定' 按鈕");
     await confirmDialogButton.click({ timeout: 5000 });
 
     await page.waitForTimeout(700 + Math.random()*500);
@@ -352,17 +421,19 @@ async function confirm(page, logger, recaptcha) {
     let solveAttempted = false;
     try {
         const recaptchaIframe = page.frameLocator("iframe[src*='recaptcha/api2/anchor']");
-        await recaptchaIframe.locator("#recaptcha-anchor").waitFor({ state: 'visible', timeout: 5000}); // Check if anchor exists
+        logger.log("檢查 reCAPTCHA anchor...");
+        await recaptchaIframe.locator("#recaptcha-anchor").waitFor({ state: 'visible', timeout: 7000}); // Slightly longer wait for anchor
+        logger.log("找到 reCAPTCHA anchor");
 
-        if (recaptcha.process === true) {
-             logger.log("偵測到需要處理 reCAPTCHA (基於 response)");
+        if (recaptcha.process === true) { // Flag based on network responses
+             logger.log("網路回應顯示需要處理 reCAPTCHA，開始處理...");
              try {
                  await timeout_promise(solve(page, { delay: 64 }), 120000); // Increased timeout
                  solveAttempted = true;
                  logger.log("reCAPTCHA 自動處理嘗試完成");
              } catch (solveError) {
                  if (solveError instanceof NotFoundError) {
-                     logger.error("reCAPTCHA [Solver NotFound]");
+                     logger.error("reCAPTCHA 錯誤 [Solver NotFoundError]");
                  } else if (solveError.message && solveError.message.includes('timed out')) {
                      logger.error("reCAPTCHA 處理超時");
                  } else {
@@ -371,13 +442,12 @@ async function confirm(page, logger, recaptcha) {
                  throw solveError; // Re-throw to signal failure in this attempt
              }
         } else {
-             logger.log("檢查認為不需要處理 reCAPTCHA (基於 response)，但 reCAPTCHA 框存在");
+             logger.log("網路回應未觸發 reCAPTCHA 標記，但 anchor 存在。可能不需要解或標記邏輯有誤");
              await page.waitForTimeout(1000);
         }
-
     } catch (anchorError) {
          if (anchorError.message && anchorError.message.includes('Timeout')) {
-            logger.log("未找到 reCAPTCHA anchor 元素，假設無需處理");
+            logger.log("在超時時間內未找到 reCAPTCHA anchor 元素，假設無需處理");
          } else {
              logger.warn(`檢查 reCAPTCHA anchor 時出錯: ${anchorError.message}`);
          }
@@ -385,35 +455,37 @@ async function confirm(page, logger, recaptcha) {
 
     logger.log(`等待最終頁面加載 ${solveAttempted ? '(reCAPTCHA 已嘗試處理)' : ''}...`);
     await page.waitForLoadState('networkidle', { timeout: 60000 });
+    logger.log(`最終頁面加載狀態為 networkidle, URL: ${page.url()}`);
 
   } catch (err) {
     logger.error(`確認兌換過程中出錯: ${err.message}. URL: ${page.url()}`);
      if (page && !page.isClosed()) {
        await page.screenshot({ path: `error_confirm_process_${Date.now()}.png` }).catch(e=>logger.error(`截圖失敗: ${e}`));
      }
-    throw err;
+    throw err; // Re-throw error to be caught by the attempt loop
   }
 }
 
 
 function report({ lottery, unfinished }) {
-  let body = "# 福利社抽抽樂 \n\n";
+  let body = "# 福利社抽抽樂 結果\n\n";
   if (lottery > 0) {
-    body += `✨✨✨ 獲得 **${lottery}** 個抽獎機會，價值 **${(lottery * 500).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}** 巴幣 ✨✨✨\n`;
+    body += `✨✨✨ 成功獲得 **${lottery}** 個抽獎機會，預估價值 **${(lottery * 500).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}** 巴幣 ✨✨✨\n`;
   } else {
-      body += "😕 本次未獲得任何抽獎機會。\n";
+      body += "😕 本次執行未獲得任何新的抽獎機會。\n";
   }
 
   const unfinishedKeys = Object.keys(unfinished);
   if (unfinishedKeys.length === 0 && lottery > 0) {
-    body += "🟢 所有找到的抽獎皆已完成\n";
+    body += "🟢 所有找到的抽獎皆已成功處理或之前已完成。\n";
   } else if (unfinishedKeys.length > 0) {
     body += `\n⚠️ **${unfinishedKeys.length}** 個抽獎未能自動完成：\n`;
     unfinishedKeys.forEach((key) => {
        body += `- ❌ ***[${key}](${unfinished[key]})***\n`;
     });
-  } else {
-      body += "ℹ️ 沒有發現抽獎或所有發現的都已完成。\n"
+     body += "\n請檢查 Actions Log 以獲取詳細錯誤信息。\n";
+  } else if (unfinishedKeys.length === 0 && lottery === 0) {
+      body += "ℹ️ 沒有發現可執行抽獎的項目，或所有項目都已完成/無法處理。\n"
   }
   body += "\n";
   return body;
