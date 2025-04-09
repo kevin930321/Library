@@ -261,7 +261,6 @@ async function confirm(page, logger, recaptcha) {
 
 
 function report({ lottery, unfinished }) {
-    let body = "# 福利社抽抽樂 \n\n";
     body += `✨✨✨ 獲得 **${lottery}** 個抽獎機會，價值 **${(lottery * 500).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}** 巴幣 ✨✨✨\n`;
 
     const unfinishedKeys = Object.keys(unfinished);
