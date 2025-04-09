@@ -116,6 +116,7 @@ var lottery_default = {
                   },
                   data: "token=" + encodeURIComponent(csrfToken) + "&area=item&sn=" + encodeURIComponent(snValue)
                 });
+                logger.success(`[${name}] 成功跳過廣告`);
               } catch (error) {
                 logger.error("發送已看廣告請求時發生錯誤:", error);
                 break;
@@ -268,7 +269,7 @@ function report({ lottery, unfinished }) {
   }
   Object.keys(unfinished).forEach((key) => {
     if (unfinished[key] === void 0) return;
-    body += `❌ 未能自動完成所有 ***[${key}](${unfinished[key]})*** 的抽獎\n`;
+    body += `❌ 未能自動完成所有 ***[${key}](${unfinished[key]})*** 的抽獎\n\n`;
   });
   body += "\n";
   return body;
