@@ -265,10 +265,10 @@ function report({ lottery, unfinished }) {
         body += `✨✨✨ 獲得 **${lottery}** 個抽獎機會，價值 **${(lottery * 500).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}** 巴幣 ✨✨✨\n`;
     }
     if (Object.keys(unfinished).length > 0) {
-        body += "🔴以下 " + Object.keys(unfinished).length + " 個抽抽樂未能成功完成兌換：\n\n";
-        Object.keys(unfinished).forEach(key => {
-            if (unfinished[key] === void 0) return;
-            body += "• " + key + "\n";
+        body += `\n🔴 以下 ${unfinishedKeys.length} 個抽抽樂未能成功完成兌換:\n`;
+        unfinishedKeys.forEach((key) => {
+            if (unfinished[key]) {
+                 body += `- [${key}](${unfinished[key]})\n`;
         });
     } else {
         body += "🟢 所有抽獎皆已完成\n";
