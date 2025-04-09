@@ -90,6 +90,7 @@ var lottery_default = {
                                 // 移除 task_page.reload()
                                 // await task_page.reload();
                                 // await task_page.waitForLoadState('networkidle');
+                                logger.log("成功回答問題");
                             } catch (error) {
                                 logger.error("post 回答問題時發生錯誤,正在重試中");
                                 break;
@@ -104,7 +105,7 @@ var lottery_default = {
                             const response = await task_page.request.get("https://fuli.gamer.com.tw/ajax/check_ad.php?area=item&sn=" + encodeURIComponent(snValue));
                             const data = JSON.parse(await response.text());
                             if (data.data && data.data.finished === 1) {
-                                logger.info("廣告已跳過");
+                                logger.info("廣告已跳過 (先前已完成)");
                             } else {
                                 const tokenResponse = await task_page.request.get("https://fuli.gamer.com.tw/ajax/getCSRFToken.php?_=1702883537159");
                                 const csrfToken = (await tokenResponse.text()).trim();
@@ -115,6 +116,7 @@ var lottery_default = {
                                         },
                                         data: "token=" + encodeURIComponent(csrfToken) + "&area=item&sn=" + encodeURIComponent(snValue)
                                     });
+                                    logger.log("成功跳過廣告");
                                 } catch (error) {
                                     logger.error("發送已看廣告請求時發生錯誤:", error);
                                     break;
@@ -135,39 +137,6 @@ var lottery_default = {
                         } catch (e) {
                             logger.error("點擊看廣告按鈕時發生錯誤:", e);
                             break;
-                        }
-
-                        // 處理可能彈出的對話框
-                        //await handleDialog(task_page, logger);
-                        try {
-                            // 等待對話框出現，並設定較長的超時時間
-                            await task_page.waitForSelector('.dialogify__content', { timeout: 10000 });
-
-                            // 停用確認按鈕
-                            const confirmButton = await task_page.$('.dialogify__content .btn-box .btn-insert.btn-primary');
-                            if (confirmButton) {
-                                await confirmButton.evaluate(button => {
-                                    button.disabled = true;
-                                    button.style.backgroundColor = '#e5e5e5';
-                                });
-                            }
-
-                            // 等待一小段時間後點擊取消按鈕
-                            await task_page.waitForTimeout(1000);
-                            const cancelButton = await task_page.$('.dialogify__content .btn-box .btn-insert:not(.btn-primary)');
-                            if (cancelButton) {
-                                await cancelButton.click();
-
-                                // 恢復確認按鈕的狀態
-                                if (confirmButton) {
-                                    await confirmButton.evaluate(button => {
-                                        button.disabled = false;
-                                        button.style.backgroundColor = '';
-                                    });
-                                }
-                            }
-                        } catch (error) {
-                            logger.log('沒有發現對話框，或處理對話框時發生錯誤，可能是沒有彈出對話框屬於正常現象:', error);
                         }
 
 
@@ -203,6 +172,7 @@ var lottery_default = {
         return { lottery, unfinished };
     }
 };
+
 
 async function getList(page, logger) {
     let draws;
