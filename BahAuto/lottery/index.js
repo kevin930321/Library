@@ -60,7 +60,9 @@ var lottery_default = {
             await task_page.waitForTimeout(1e3);
 
             const final_url = task_page.url();
-            if (final_url.includes("/buyD.php") && final_url.includes("ad=1")) {
+            const hasAdTicket = await task_page.content().then(body => body.includes("廣告抽獎券"));
+
+            if (final_url.includes("/buyD.php") && final_url.includes("ad=1") && hasAdTicket) {
               logger.log(`正在確認結算頁面`);
               await checkInfo(task_page, logger).catch((...args) => logger.error(...args));
               await confirm(task_page, logger, recaptcha).catch((...args) => logger.error(...args));
@@ -73,7 +75,8 @@ var lottery_default = {
               }
             } else {
               logger.warn(final_url);
-              logger.error("未進入結算頁面，重試中 \u001b[91m✘\u001b[m");
+              logger.warn(`廣告抽獎券: ${hasAdTicket}`);
+              logger.error("未進入正確的結算頁面，重試中 \u001b[91m✘\u001b[m");
             }
           } catch (err) {
             logger.error("!", err);
