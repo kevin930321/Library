@@ -95,7 +95,7 @@ var lottery_default = {
                 }
               }
               const urlParams = new URLSearchParams(task_page.url().split('?')[1]);
-              snValue = urlParams.get('sn'); // 獲取 snValue
+              snValue = urlParams.get('sn');
               logger.log('sn:', encodeURIComponent(snValue));
               try {
                 const response = await task_page.request.get("https://fuli.gamer.com.tw/ajax/check_ad.php?area=item&sn=" + encodeURIComponent(snValue));
@@ -234,14 +234,9 @@ async function confirm(page, logger, recaptcha) {
     await page.waitForSelector("a:has-text('確認兌換')");
     await page.click("a:has-text('確認兌換')");
     const next_navigation = page.waitForNavigation().catch(() => {});
-    const response = await next_navigation;
-    if (response && !response.ok()) {
-      logger.error(`伺服器回應錯誤：${response.status} ${response.statusText}`);
-    }
-    try {
-      await page.waitForSelector("button:has-text('確定')", { timeout: 500 });
-      await page.click("button:has-text('確定')");
-      await page.waitForTimeout(3000);
+    await page.waitForSelector("button:has-text('確定')");
+    await page.click("button:has-text('確定')");
+    await page.waitForTimeout(3000);
     if (recaptcha.process === true) {
       const recaptcha_frame_width = await page.$eval("iframe[src^='https://www.google.com/recaptcha/api2/bframe']", (elm) => getComputedStyle(elm).width);
       if (recaptcha_frame_width !== "100%") {
