@@ -100,7 +100,7 @@ var lottery_default = {
                 const response = await task_page.request.get("https://fuli.gamer.com.tw/ajax/check_ad.php?area=item&sn=" + encodeURIComponent(snValue));
                 const data = JSON.parse(await response.text());
                 if (data.data && data.data.finished === 1) {
-                  logger.info("廣告已跳過");           
+                  logger.info("已經跳過廣告了");           
                   break;
                 }
               } catch (e) {
