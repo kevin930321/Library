@@ -233,14 +233,9 @@ async function confirm(page, logger, recaptcha) {
     await page.waitForTimeout(100);
     await page.waitForSelector("a:has-text('確認兌換')");
     await page.click("a:has-text('確認兌換')");
-    try {
-        await page.waitForSelector("button:has-text('確定')", {timeout: 5000});
-        await page.click("button:has-text('確定')");
-    } catch (error) {
-        logger.error("點擊 '確定' 按鈕失敗:", error);
-        throw error;
-    }
     const next_navigation = page.waitForNavigation().catch(() => {});
+    await page.waitForSelector("button:has-text('確定')");
+    await page.click("button:has-text('確定')");
     await page.waitForTimeout(5000);
     if (recaptcha.process === true) {
       const recaptcha_frame_width = await page.$eval("iframe[src^='https://www.google.com/recaptcha/api2/bframe']", (elm) => getComputedStyle(elm).width);
@@ -261,7 +256,6 @@ async function confirm(page, logger, recaptcha) {
   } catch (err) {
     logger.error(page.url());
     logger.error(err);
-    throw err;
   }
 }
 
