@@ -260,19 +260,21 @@ async function confirm(page, logger, recaptcha) {
 
 
 function report({ lottery, unfinished }) {
-  let body = "# 福利社抽抽樂 \n\n";
-  if (lottery) {
-    body += `✨✨✨ 獲得 **${lottery}** 個抽獎機會，價值 **${(lottery * 500).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}** 巴幣 ✨✨✨\n`;
-  }
-  if (Object.keys(unfinished).length === 0) {
-    body += "🟢 所有抽獎皆已完成\n";
-  }
-  Object.keys(unfinished).forEach((key) => {
-    if (unfinished[key] === void 0) return;
-    body += `❌ 未能自動完成所有 ***[${key}](${unfinished[key]})*** 的抽獎\n\n`;
-  });
-  body += "\n";
-  return body;
+    let body = "# 福利社抽抽樂 \n\n";
+    if (lottery) {
+        body += `✨✨✨ 獲得 **${lottery}** 個抽獎機會，價值 **${(lottery * 500).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}** 巴幣 ✨✨✨\n`;
+    }
+    if (Object.keys(unfinished).length > 0) {
+        body += "🔴以下 " + Object.keys(unfinished).length + " 個抽抽樂未能成功完成兌換：\n\n";
+        Object.keys(unfinished).forEach(key => {
+            if (unfinished[key] === void 0) return;
+            body += "• " + key + "\n";
+        });
+    } else {
+        body += "🟢 所有抽獎皆已完成\n";
+    }
+    body += "\n";
+    return body;
 }
 
 function timeout_promise(promise, delay) {
