@@ -59,7 +59,6 @@ var lottery_default = {
                 logger.warn('沒有發現廣告兌換按鈕, 可能為商品次數用盡或是已過期。');
                 break;
               }
-
               let questionButton = await task_page.locator('a[onclick^="showQuestion(1);"]');
               if (await questionButton.isVisible()) {
                 logger.log("需要回答問題，正在回答問題");
@@ -96,7 +95,6 @@ var lottery_default = {
                   break;
                 }
               }
-
               const urlParams = new URLSearchParams(task_page.url().split('?')[1]);
               snValue = urlParams.get('sn');
               logger.log('sn:', encodeURIComponent(snValue));
@@ -111,7 +109,6 @@ var lottery_default = {
                 logger.error('解析廣告狀態檢查的請求發生錯誤, 正在重試中:', e);
                 break;
               }
-
               const tokenResponse = await task_page.request.get("https://fuli.gamer.com.tw/ajax/getCSRFToken.php?_=1702883537159");
               const csrfToken = (await tokenResponse.text()).trim();
               try {
@@ -127,10 +124,10 @@ var lottery_default = {
                 logger.error("發送已看廣告請求時發生錯誤:", error);
                 break;
               }
-
               break;
             }
-            await task_page.waitForTimeout(1000);
+            
+            await task_page.waitForTimeout(1500);
             await task_page.goto(`https://fuli.gamer.com.tw/buyD.php?ad=1&sn=${snValue}`);
             await task_page.waitForTimeout(1e3)
 
@@ -263,7 +260,6 @@ async function confirm(page, logger, recaptcha) {
     logger.error(err);
   }
 }
-
 
 function report({ lottery, unfinished }) {
     let body = "# 福利社抽抽樂 \n\n";
