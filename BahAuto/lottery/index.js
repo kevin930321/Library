@@ -142,11 +142,11 @@ var lottery_default = {
                 lottery++;
               } else {
                 logger.warn(final_url);
+                logger.warn(`廣告抽獎券: ${AdCoupon}`);
                 logger.error("發生錯誤，重試中 \u001b[91m✘\u001b[m");
               }
             } else {
               logger.warn(final_url);
-              logger.warn(`廣告抽獎券: ${AdCoupon}`);
               logger.error("未進入正確的結算頁面，重試中 \u001b[91m✘\u001b[m");
             }
           } catch (err) {
@@ -236,7 +236,7 @@ async function confirm(page, logger, recaptcha) {
     const next_navigation = page.waitForNavigation().catch(() => {});
     await page.waitForSelector("button:has-text('確定')");
     await page.click("button:has-text('確定')");
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(3000);
     if (recaptcha.process === true) {
       const recaptcha_frame_width = await page.$eval("iframe[src^='https://www.google.com/recaptcha/api2/bframe']", (elm) => getComputedStyle(elm).width);
       if (recaptcha_frame_width !== "100%") {
