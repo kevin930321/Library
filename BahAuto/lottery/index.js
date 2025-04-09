@@ -138,7 +138,38 @@ var lottery_default = {
                         }
 
                         // 處理可能彈出的對話框
-                        await handleDialog(task_page, logger);
+                        //await handleDialog(task_page, logger);
+                        try {
+                            // 等待對話框出現，並設定較長的超時時間
+                            await task_page.waitForSelector('.dialogify__content', { timeout: 10000 });
+
+                            // 停用確認按鈕
+                            const confirmButton = await task_page.$('.dialogify__content .btn-box .btn-insert.btn-primary');
+                            if (confirmButton) {
+                                await confirmButton.evaluate(button => {
+                                    button.disabled = true;
+                                    button.style.backgroundColor = '#e5e5e5';
+                                });
+                            }
+
+                            // 等待一小段時間後點擊取消按鈕
+                            await task_page.waitForTimeout(1000);
+                            const cancelButton = await task_page.$('.dialogify__content .btn-box .btn-insert:not(.btn-primary)');
+                            if (cancelButton) {
+                                await cancelButton.click();
+
+                                // 恢復確認按鈕的狀態
+                                if (confirmButton) {
+                                    await confirmButton.evaluate(button => {
+                                        button.disabled = false;
+                                        button.style.backgroundColor = '';
+                                    });
+                                }
+                            }
+                        } catch (error) {
+                            logger.log('沒有發現對話框，或處理對話框時發生錯誤，可能是沒有彈出對話框屬於正常現象:', error);
+                        }
+
 
                         const final_url = task_page.url();
                         if (final_url.includes("/buyD.php") && final_url.includes("ad=1")) {
@@ -172,41 +203,6 @@ var lottery_default = {
         return { lottery, unfinished };
     }
 };
-
-// **新增輔助函式：處理對話框**
-async function handleDialog(page, logger) {
-    try {
-        // 等待對話框出現
-        await page.waitForSelector('.dialogify__content', { timeout: 5000 });
-
-        // 停用確認按鈕
-        const confirmButton = await page.$('.dialogify__content .btn-box .btn-insert.btn-primary');
-        if (confirmButton) {
-            await confirmButton.evaluate(button => {
-                button.disabled = true;
-                button.style.backgroundColor = '#e5e5e5';
-            });
-        }
-
-        // 等待一小段時間後點擊取消按鈕
-        await page.waitForTimeout(1000);
-        const cancelButton = await page.$('.dialogify__content .btn-box .btn-insert:not(.btn-primary)');
-        if (cancelButton) {
-            await cancelButton.click();
-
-            // 恢復確認按鈕的狀態
-            if (confirmButton) {
-                await confirmButton.evaluate(button => {
-                    button.disabled = false;
-                    button.style.backgroundColor = '';
-                });
-            }
-        }
-    } catch (error) {
-        logger.error('處理對話框時發生錯誤:', error);
-    }
-}
-
 
 async function getList(page, logger) {
     let draws;
@@ -305,7 +301,7 @@ async function confirm(page, logger, recaptcha) {
 function report({ lottery, unfinished }) {
     let body = "# 福利社抽抽樂 \n\n";
     if (lottery) {
-        body += `✨✨✨ 獲得 **${lottery}** 個抽獎機會，價值 **${(lottery * 500).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}** 巴幣 ✨✨✨\n`;
+        body += "✨✨✨ 獲得 **${lottery}** 個抽獎機會，價值 **${(lottery * 500).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}** 巴幣 ✨✨✨\n";
     }
     if (Object.keys(unfinished).length === 0) {
         body += "🟢 所有抽獎皆已完成\n";
