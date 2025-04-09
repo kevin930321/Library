@@ -100,7 +100,7 @@ var lottery_default = {
                 const response = await task_page.request.get("https://fuli.gamer.com.tw/ajax/check_ad.php?area=item&sn=" + encodeURIComponent(snValue));
                 const data = JSON.parse(await response.text());
                 if (data.data && data.data.finished === 1) {
-                  logger.info("已經跳過廣告了");           
+                  logger.info("已經跳過廣告了");
                   break;
                 }
               } catch (e) {
@@ -117,6 +117,7 @@ var lottery_default = {
                   data: "token=" + encodeURIComponent(csrfToken) + "&area=item&sn=" + encodeURIComponent(snValue)
                 });
                 logger.success(`[${name}] 成功跳過廣告`);
+                await task_page.waitForTimeout(1500);
               } catch (error) {
                 logger.error("發送已看廣告請求時發生錯誤:", error);
                 break;
@@ -261,14 +262,15 @@ async function confirm(page, logger, recaptcha) {
 
 function report({ lottery, unfinished }) {
     let body = "# 福利社抽抽樂 \n\n";
-    if (lottery) {
-        body += `✨✨✨ 獲得 **${lottery}** 個抽獎機會，價值 **${(lottery * 500).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}** 巴幣 ✨✨✨\n`;
-    }
-    if (Object.keys(unfinished).length > 0) {
+    body += `✨✨✨ 獲得 **${lottery}** 個抽獎機會，價值 **${(lottery * 500).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}** 巴幣 ✨✨✨\n`;
+
+    const unfinishedKeys = Object.keys(unfinished);
+    if (unfinishedKeys.length > 0) {
         body += `\n🔴 以下 ${unfinishedKeys.length} 個抽抽樂未能成功完成兌換:\n`;
         unfinishedKeys.forEach((key) => {
             if (unfinished[key]) {
                  body += `- [${key}](${unfinished[key]})\n`;
+            }
         });
     } else {
         body += "🟢 所有抽獎皆已完成\n";
