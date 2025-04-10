@@ -57,7 +57,7 @@ var login_default = {
             "Content-Type": "application/x-www-form-urlencoded",
             "User-Agent": "Bahadroid (https://www.gamer.com.tw/)",
             "x-bahamut-app-instanceid": "cc2zQIfDpg4",
-            "X-Bahamut-App-Version": "932",
+            "X-Bahamut-App-Version": "982",
             "X-Bahamut-App-Android": "tw.com.gamer.android.activecenter",
             "Connection": "Keep-Alive",
             "accept-encoding": "gzip",
