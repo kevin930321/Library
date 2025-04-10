@@ -236,7 +236,7 @@ async function confirm(page, logger, recaptcha) {
     const next_navigation = page.waitForNavigation().catch(() => {});
     await page.waitForSelector("button:has-text('確定')");
     await page.click("button:has-text('確定')");
-    await page.waitForTimeout(5000);
+    await page.waitForTimeout(300);
     if (recaptcha.process === true) {
       const recaptcha_frame_width = await page.$eval("iframe[src^='https://www.google.com/recaptcha/api2/bframe']", (elm) => getComputedStyle(elm).width);
       if (recaptcha_frame_width !== "100%") {
