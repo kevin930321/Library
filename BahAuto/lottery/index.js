@@ -52,7 +52,6 @@ var lottery_default = {
               break;
             }
             logger.log(`[${idx + 1} / ${draws.length}] (${attempts}) ${name}`);
-
             for (let retried = 1; retried <= CHANGING_RETRY; retried++) {
               let adButtonLocator = task_page.locator('a[onclick^="window.FuliAd.checkAd"]');
               if (!(await adButtonLocator.isVisible())) {
@@ -102,7 +101,7 @@ var lottery_default = {
                 const response = await task_page.request.get("https://fuli.gamer.com.tw/ajax/check_ad.php?area=item&sn=" + encodeURIComponent(snValue));
                 const data = JSON.parse(await response.text());
                 if (data.data && data.data.finished === 1) {
-                  logger.info("你已經看過或跳過廣告!");
+                  logger.info("已經跳過廣告了");
                   break;
                 }
               } catch (e) {
@@ -126,8 +125,7 @@ var lottery_default = {
               }
               break;
             }
-            
-            await task_page.waitForTimeout(1500);
+
             await task_page.goto(`https://fuli.gamer.com.tw/buyD.php?ad=1&sn=${snValue}`);
             await task_page.waitForTimeout(1e3)
 
@@ -260,6 +258,7 @@ async function confirm(page, logger, recaptcha) {
     logger.error(err);
   }
 }
+
 
 function report({ lottery, unfinished }) {
     let body = "# 福利社抽抽樂 \n\n";
