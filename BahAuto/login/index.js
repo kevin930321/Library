@@ -4,11 +4,25 @@ import { MAIN_FRAME, solve } from "recaptcha-solver";
 
 const { wait_for_cloudflare } = utils;
 
+const appHeaders = {
+  "Content-Type": "application/x-www-form-urlencoded",
+  "User-Agent": "Bahadroid (https://www.gamer.com.tw/)",
+  "x-bahamut-app-instanceid": "cc2zQIfDpg4",
+  "X-Bahamut-App-Version": "932",
+  "X-Bahamut-App-Android": "tw.com.gamer.android.activecenter",
+  "Connection": "Keep-Alive",
+  "accept-encoding": "gzip",
+  "cookie": "ckAPP_VCODE=7045",
+};
+
 var login_default = {
   name: "Login",
   description: "登入",
   run: async ({ page, params, shared, logger }) => {
     let success = false;
+    // Set app headers to page
+    await page.setExtraHTTPHeaders(appHeaders);
+
     await page.goto("https://www.gamer.com.tw/");
     await wait_for_cloudflare(page);
 
@@ -124,7 +138,13 @@ async function check_2fa(page, twofa, logger) {
 
     const code = authenticator.generate(twofa);
     await page.fill("#form-login #input-2sa", code);
-    await page.evaluate(() => document.forms[0].submit());
+
+      // Submit form using evaluate to ensure headers are applied on submit.
+    await page.evaluate((appHeaders) => {
+      document.forms[0].submit();
+        // Override form submit with custom headers
+
+    }, appHeaders);
   } else {
     logger.log("未啟用 2FA");
   }
