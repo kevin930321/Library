@@ -12,60 +12,91 @@ var login_default = {
 
     for (let i = 0; i < max_attempts; i++) {
       try {
-        logger.log("正在嘗試使用 APP 登入...");
-
-        const query = new URLSearchParams();
-        query.append("userid", params.username);
-        query.append("password", params.password);
-        query.append("vcode", "7045");
-
-        const headers = {
-          "Content-Type": "application/x-www-form-urlencoded",
-          "User-Agent": "Bahadroid (https://www.gamer.com.tw/)",
-          "x-bahamut-app-instanceid": "cc2zQIfDpg4",
-          "X-Bahamut-App-Version": "932",
-          "X-Bahamut-App-Android": "tw.com.gamer.android.activecenter",
-          "Connection": "Keep-Alive",
-          "accept-encoding": "gzip",
-          "cookie": "ckAPP_VCODE=7045",
-        };
-        
-        //先導向首頁確認cloudflare
+        logger.log("正在檢測登入狀態");
         await page.goto("https://www.gamer.com.tw/");
         await wait_for_cloudflare(page);
 
-        // 進行登入前的 2FA 檢查 (調整成與API配合，如果有2FA，則一併傳遞)
-        let twoFACode = "";
-        if (params.twofa?.length) {
-          twoFACode = authenticator.generate(params.twofa);
-          query.append("twoStepAuth", twoFACode); //2fa
+        // 嘗試關閉可能出現的彈出視窗
+        await page
+          .waitForSelector("#driver-popover-content > button", { timeout: 5000 })
+          .then(async (el) => {
+            await el.click();
+            logger.log("關閉了彈出視窗");
+          })
+          .catch((err) => {
+            logger.warn("無法找到或點擊彈出視窗按鈕，可能已被關閉: " + err.message);
+          });
+
+        // 檢測是否已登入
+        let not_login_signal = await page.waitForSelector("img.main-nav__profile", { timeout: 5000 }).catch(() => null);
+        if (!not_login_signal) {
+          logger.warn("無法找到登入圖示，可能網站有變更");
+        } else {
+          const profileImgSrc = (await not_login_signal.getAttribute("src")) || "";
+          if (!profileImgSrc.includes("none.gif")) {
+            logger.log("登入狀態: 已登入");
+            success = true;
+            break;
+          }
         }
 
+        logger.log("登入中 ...");
+
+        const query = new URLSearchParams();
+        query.append("uid", params.username);
+        query.append("passwd", params.password);
+        query.append("vcode", "7045");
+
+        if (params.twofa?.length) {
+          query.append("twoStepAuth", authenticator.generate(params.twofa));
+        }
 
         const res = await page.request.post("https://api.gamer.com.tw/mobile_app/user/v3/do_login.php", {
           data: query.toString(),
-          headers: headers,
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "User-Agent": "Bahadroid (https://www.gamer.com.tw/)",
+            "x-bahamut-app-instanceid": "cc2zQIfDpg4",
+            "X-Bahamut-App-Version": "932",
+            "X-Bahamut-App-Android": "tw.com.gamer.android.activecenter",
+            "Connection": "Keep-Alive",
+            "accept-encoding": "gzip",
+            "cookie": "ckAPP_VCODE=7045",
+          },
         });
 
 
         if (res.status() === 200) {
           const body = await res.json();
 
-          if (body.result === "success") {
-            logger.log("APP 登入成功");
-            success = true;
-            break;
+           // 成功登入後再次檢查
+          await page.goto("https://www.gamer.com.tw/");
+          await page.waitForTimeout(1000);
+
+          const not_login_signal = await page.waitForSelector("img.main-nav__profile", { timeout: 5000 }).catch(() => null);
+          if (not_login_signal) {
+            const profileImgSrc = (await not_login_signal.getAttribute("src")) || "";
+            if (!profileImgSrc.includes("none.gif")) {
+              logger.log("成功登入");
+              success = true;
+              break;
+            }
           } else {
-            logger.error("APP 登入失敗，訊息:", body.message || JSON.stringify(body)); //印出message或是整個body方便debug
+            logger.warn("登入後，無法找到登入圖示，可能網站有變更");
           }
+
+          logger.success("✅ 登入成功");
+          success = true;
+          break;
+
         } else {
-          logger.error(`APP 登入請求失敗，狀態碼: ${res.status()}`);
+          const body = await res.json();
+          logger.error("❌ 登入失敗: ", body);
         }
 
       } catch (err) {
-        logger.error("嘗試 APP 登入時發生錯誤:", err);
+        logger.error("登入時發生錯誤，重新嘗試中", err);
       }
-      await page.waitForTimeout(1000);
     }
 
     if (success) {
@@ -75,6 +106,5 @@ var login_default = {
     return { success };
   },
 };
-
 
 export { login_default as default };
