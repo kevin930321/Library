@@ -68,22 +68,79 @@ var login_default = {
 
         if (res.status() === 200) {
           const body = await res.json();
+          logger.log("API 登入成功", body);
 
-           // 成功登入後再次檢查
+          // 取得 API 回應中的 set-cookie 標頭
+          const setCookieHeaders = res.headers()['set-cookie'];
+          if (setCookieHeaders) {
+            const cookies = setCookieHeaders.map(header => {
+              const cookiePairs = header.split(';');
+              const cookieObj = {};
+              cookiePairs.forEach(pair => {
+                const [key, ...values] = pair.trim().split('=');
+                cookieObj[key] = values.join('=');
+              });
+              return cookieObj;
+            });
+            const setCookies = setCookieHeaders.split(';').map(cookie => {
+              let [name, value] = cookie.trim().split('=');
+
+              // 若沒有值則設定為空字串
+              if (value === undefined) {
+                value = '';
+              }
+            });
+            if (Array.isArray(setCookieHeaders))
+              setCookieHeaders.forEach(header => {
+                  const cookieString = header.split(';')[0]; // 取第一個 cookie, 因為剩下的都是 attribute
+                  const [cookieName, cookieValue] = cookieString.split('=');
+              })
+
+            //await page.context().addCookies(setCookies);
+            await page.context().addCookies(
+              setCookieHeaders.split(';').map(cookie => {
+                let [name, value] = cookie.trim().split('=');
+          
+                // 若沒有值則設定為空字串
+                if (value === undefined) {
+                  value = '';
+                }
+
+                const obj = {
+                  name: name,
+                  value: value,
+                  domain: '.gamer.com.tw', // 確保設定正確的 domain
+                  path: '/',
+                };
+          
+                // 檢查 obj 屬性
+                if (!obj.name || !obj.value) {
+                  logger.warn('無效的 Cookie:', obj);
+                }
+          
+                return obj;
+            })
+            );
+            logger.log('已設定 Cookies:');
+          }
+
+           // 等待網頁載入完成 (包括網路空閒)
           await page.goto("https://www.gamer.com.tw/");
+          await page.waitForLoadState('networkidle');
           await page.waitForTimeout(1000);
 
-          const not_login_signal = await page.waitForSelector("img.main-nav__profile", { timeout: 5000 }).catch(() => null);
-          if (not_login_signal) {
-            const profileImgSrc = (await not_login_signal.getAttribute("src")) || "";
-            if (!profileImgSrc.includes("none.gif")) {
-              logger.log("成功登入");
-              success = true;
-              break;
-            }
-          } else {
-            logger.warn("登入後，無法找到登入圖示，可能網站有變更");
+
+          // 確認登入狀態 - 等待登入後才會出現的元素
+          try {
+            await page.waitForSelector(".main-nav__name", { timeout: 10000 }); // 將 .會員登入後才有的選擇器 替換成登入後才出現的元素
+            logger.log("成功登入，已找到會員專屬元素");
+            success = true;
+            break;
+
+          } catch (e) {
+            logger.warn("雖然 API 登入成功，但會員專屬元素未出現，可能登入未同步");
           }
+
 
           logger.success("✅ 登入成功");
           success = true;
