@@ -60,39 +60,23 @@ var lottery_default = {
               }
               let questionButton = await task_page.locator('a[onclick^="showQuestion(1);"]');
               if (await questionButton.isVisible()) {
-                logger.log("需要回答問題，正在回答問題");
-                const tokenResponse = await task_page.request.get("https://fuli.gamer.com.tw/ajax/getCSRFToken.php?_=1702883537159");
-                const csrfToken = (await tokenResponse.text()).trim();
-                const templateContent = await task_page.locator("#question-popup").innerHTML();
-                let questionNumbers = [];
-                let regex = /data-question="(\d+)"/g;
-                let match;
-                while ((match = regex.exec(templateContent)) !== null) {
-                  questionNumbers.push(match[1]);
-                }
-                let answers = [];
-                for (let question of questionNumbers) {
-                  const answer = await task_page.locator(`.fuli-option[data-question="${question}"]`).getAttribute("data-answer");
-                  answers.push(answer);
-                }
-                let formData = {};
-                const urlParams = new URLSearchParams(task_page.url().split('?')[1]);
-                snValue = urlParams.get('sn');
-                formData['sn'] = snValue;
-                formData['token'] = csrfToken;
-                answers.forEach((ans, index) => {
-                  formData[`answer[${index}]`] = ans;
-                });
-                try {
-                  await task_page.request.post("https://fuli.gamer.com.tw/ajax/answer_question.php", {
-                    form: formData
-                  });
-                  await task_page.reload();
-                  await task_page.waitForLoadState('networkidle');
-                } catch (error) {
-                  logger.error("post 回答問題時發生錯誤,正在重試中");
-                  break;
-                }
+                logger.info(`需要回答問題，正在回答問題`);
+                // ------------------  程式B的回答問題方法  ------------------
+                await task_page.$$eval(
+                  "#dialogify_1 .dialogify__body a",
+                  (options) => {
+                    options.forEach(
+                      (option) => {
+                        if (option.dataset.option == option.dataset.answer)
+                          option.click();
+                      }
+                    );
+                  }
+                );
+                // ------------------  程式B的回答問題方法結束  ------------------
+                await task_page.waitForSelector("#btn-buy");
+                await task_page.waitForTimeout(100);
+                await task_page.click("#btn-buy");
               }
               const urlParams = new URLSearchParams(task_page.url().split('?')[1]);
               snValue = urlParams.get('sn');
