@@ -76,17 +76,20 @@ var lottery_default = {
                 const answer = await task_page.locator(`.fuli-option[data-question="${question}"]`).getAttribute("data-answer");
                 answers.push(answer);
               }
-              let formData = {};
+              let formData = new URLSearchParams();
               const urlParams = new URLSearchParams(task_page.url().split('?')[1]);
               snValue = urlParams.get('sn');
-              formData['sn'] = snValue;
-              formData['token'] = csrfToken;
+              formData.append('sn', snValue);
+              formData.append('token', csrfToken);
               answers.forEach((ans, index) => {
-                formData[`answer[${index}]`] = ans;
+                formData.append(`answer[${index}]`, ans);
               });
               try {
                 await task_page.request.post("https://fuli.gamer.com.tw/ajax/answer_question.php", {
-                  form: formData
+                  headers: {
+                    "Content-Type": "application/x-www-form-urlencoded"
+                  },
+                  body: formData.toString()
                 });
                 await task_page.reload();
                 await task_page.waitForLoadState('networkidle');
@@ -117,11 +120,15 @@ var lottery_default = {
               const tokenResponse = await task_page.request.get("https://fuli.gamer.com.tw/ajax/getCSRFToken.php?_=1702883537159");
               const csrfToken = (await tokenResponse.text()).trim();
               try {
+                const formData = new URLSearchParams();
+                formData.append("token", csrfToken);
+                formData.append("area", "item");
+                formData.append("sn", snValue);
                 await task_page.request.post('https://fuli.gamer.com.tw/ajax/finish_ad.php', {
                   headers: {
                     "Content-Type": "application/x-www-form-urlencoded"
                   },
-                  data: "token=" + encodeURIComponent(csrfToken) + "&area=item&sn=" + encodeURIComponent(snValue)
+                  body: formData.toString()
                 });
                 logger.success(`[${name}] 成功跳過廣告`);
                 await task_page.waitForTimeout(1500);
