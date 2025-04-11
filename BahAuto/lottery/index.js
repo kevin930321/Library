@@ -58,8 +58,6 @@ var lottery_default = {
                 logger.warn('沒有發現廣告兌換按鈕, 可能為商品次數用盡或是已過期。');
                 break;
               }
-
-              // START - 回答問題邏輯 (程式B)
               let questionButton = await task_page.locator('a[onclick^="showQuestion(1);"]');
               if (await questionButton.isVisible()) {
                 logger.log("需要回答問題，正在回答問題");
@@ -96,8 +94,6 @@ var lottery_default = {
                   break;
                 }
               }
-              // END - 回答問題邏輯 (程式B)
-
               const urlParams = new URLSearchParams(task_page.url().split('?')[1]);
               snValue = urlParams.get('sn');
               logger.log('sn:', encodeURIComponent(snValue));
