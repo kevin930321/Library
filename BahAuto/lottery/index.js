@@ -54,22 +54,16 @@ var lottery_default = {
             logger.log(`[${idx + 1} / ${draws.length}] (${attempts}) ${name}`);
             for (let retried = 1; retried <= CHANGING_RETRY; retried++) {
               let adButtonLocator = task_page.locator('a[onclick^="window.FuliAd.checkAd"]');
-
-              // 修改判斷是否需要回答問題的方式
               if (await task_page.$("#question-popup")) {
                 logger.log("需要回答問題，正在回答問題");
                 const tokenResponse = await task_page.request.get("https://fuli.gamer.com.tw/ajax/getCSRFToken.php?_=1702883537159");
                 const csrfToken = (await tokenResponse.text()).trim();
-
-                // 使用新的回答問題邏輯
                 const templateContent = await task_page.locator("#question-popup").innerHTML();
                 const tempDiv = await task_page.evaluateHandle((content) => {
                     const div = document.createElement('div');
                     div.innerHTML = content;
                     return div;
                 }, templateContent);
-
-                // 獲取所有答案選項
                 const options = await tempDiv.$$('.fuli-option');
                 let answers = [];
 
@@ -80,8 +74,6 @@ var lottery_default = {
                         answers.push(datasetAnswer);
                     }
                 }
-
-                // 加入log，顯示提取到的答案
                 logger.log(`提取到的答案: ${JSON.stringify(answers)}`);
 
                 let formData = {};
@@ -92,7 +84,6 @@ var lottery_default = {
                 answers.forEach((ans, index) => {
                   formData[`answer[${index}]`] = ans;
                 });
-
                 try {
                   await task_page.request.post("https://fuli.gamer.com.tw/ajax/answer_question.php", {
                     form: formData
@@ -104,7 +95,6 @@ var lottery_default = {
                   break;
                 }
               }
-
               const urlParams = new URLSearchParams(task_page.url().split('?')[1]);
               snValue = urlParams.get('sn');
               logger.log('sn:', encodeURIComponent(snValue));
