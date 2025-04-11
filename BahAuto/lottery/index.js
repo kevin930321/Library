@@ -59,31 +59,17 @@ var lottery_default = {
                                 break;
                             }
 
-                            // 確保問題按鈕出現再執行程式
-                            let questionButton = await task_page.locator('a[onclick^="showQuestion(1);"]');
-                            await questionButton.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {
-                                logger.warn("找不到需要回答問題的按鈕");
-                            });
-
-                            if (await questionButton.isVisible()) {
+                            // 檢查頁面原始碼中是否存在 question-popup 元素
+                            const pageContent = await task_page.content();
+                            if (pageContent.includes('<div id="question-popup"')) {
                                 logger.log("需要回答問題，正在回答問題");
                                 const tokenResponse = await task_page.request.get("https://fuli.gamer.com.tw/ajax/getCSRFToken.php");
                                 const csrfToken = (await tokenResponse.text()).trim();
 
                                 // 從頁面內容中提取問題和答案，模擬 Userscript 的行為
-                                const templateContent = await task_page.content(); // 獲取完整頁面內容
-                                const questionPopupStart = templateContent.indexOf('<div id="question-popup"');
-                                if (questionPopupStart === -1) {
-                                    logger.warn("找不到 question-popup 元素");
-                                    break;
-                                }
-
-                                const questionPopupEnd = templateContent.indexOf('</div>', questionPopupStart + 1); // 尋找結尾的 </div>
-                                if (questionPopupEnd === -1) {
-                                    logger.warn("找不到 question-popup 元素的結尾");
-                                    break;
-                                }
-                                const questionPopupHTML = templateContent.substring(questionPopupStart, questionPopupEnd + 6); // 包含 </div>
+                                const questionPopupStart = pageContent.indexOf('<div id="question-popup"');
+                                const questionPopupEnd = pageContent.indexOf('</div>', questionPopupStart + 1);
+                                const questionPopupHTML = pageContent.substring(questionPopupStart, questionPopupEnd + 6);
 
                                 // 使用 DOMParser 解析 HTML 字串
                                 const parser = new DOMParser();
@@ -107,8 +93,8 @@ var lottery_default = {
                                 }
 
                                 if (answers.length !== questionNumbers.length) {
-                                  logger.warn("問題數量與答案數量不符，跳過回答");
-                                  break;
+                                    logger.warn("問題數量與答案數量不符，跳過回答");
+                                    break;
                                 }
 
                                 let formData = {};
@@ -124,7 +110,7 @@ var lottery_default = {
                                     const response = await task_page.request.post("https://fuli.gamer.com.tw/ajax/answer_question.php", {
                                         form: formData
                                     });
-                                    if (response.status() !== 200) { // 檢查回應狀態碼
+                                    if (response.status() !== 200) {
                                         logger.error(`回答問題請求失敗，狀態碼：${response.status()}`);
                                         break;
                                     }
