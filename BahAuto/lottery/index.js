@@ -99,11 +99,6 @@ var lottery_default = {
 
             // 跳過廣告步驟
             for (let retried = 1; retried <= CHANGING_RETRY; retried++) {
-              let adButtonLocator = task_page.locator('a[onclick^="window.FuliAd.checkAd"]');
-              if (!(await adButtonLocator.isVisible())) {
-                logger.warn('沒有發現廣告兌換按鈕, 可能為商品次數用盡或是已過期。');
-                break;
-              }
 
               const urlParams = new URLSearchParams(task_page.url().split('?')[1]);
               snValue = urlParams.get('sn');
