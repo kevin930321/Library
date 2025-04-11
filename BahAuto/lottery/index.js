@@ -58,15 +58,21 @@ var lottery_default = {
               logger.log("發現 question-popup 元素，需要回答問題");
               const tokenResponse = await task_page.request.get("https://fuli.gamer.com.tw/ajax/getCSRFToken.php?_=1702883537159");
               const csrfToken = (await tokenResponse.text()).trim();
-              const templateContent = await task_page.locator("#question-popup").innerHTML();
-              let questionNumbers = [];
-              let regex = /data-question="(\d+)"/g;
-              let match;
-              while ((match = regex.exec(templateContent)) !== null) {
-                questionNumbers.push(match[1]);
-              }
+              // const templateContent = await task_page.locator("#question-popup").innerHTML();
+              // 使用evaluate來獲取所有問題的number
+              const questionNumbers = await task_page.evaluate(() => {
+                  const questionElements = document.querySelectorAll('.fuli-option[data-question]');
+                  const numbers = new Set();
+                  questionElements.forEach(el => {
+                      numbers.add(el.getAttribute('data-question'));
+                  });
+                  return Array.from(numbers); // Convert Set to Array
+              });
+
               let answers = [];
               for (let question of questionNumbers) {
+                // 等待元素出現再獲取屬性
+                await task_page.waitForSelector(`.fuli-option[data-question="${question}"]`);
                 const answer = await task_page.locator(`.fuli-option[data-question="${question}"]`).getAttribute("data-answer");
                 answers.push(answer);
               }
