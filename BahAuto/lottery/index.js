@@ -53,12 +53,6 @@ var lottery_default = {
                         }
                         logger.log(`[${idx + 1} / ${draws.length}] (${attempts}) ${name}`);
                         for (let retried = 1; retried <= CHANGING_RETRY; retried++) {
-                            let adButtonLocator = task_page.locator('a[onclick^="window.FuliAd.checkAd"]');
-                            if (!(await adButtonLocator.isVisible())) {
-                                logger.warn('沒有發現廣告兌換按鈕, 可能為商品次數用盡或是已過期。');
-                                break;
-                            }
-
                             // 檢查頁面原始碼中是否存在 question-popup 元素
                             const pageContent = await task_page.content();
                             if (pageContent.includes('<div id="question-popup"')) {
