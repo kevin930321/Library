@@ -66,7 +66,6 @@ var lottery_default = {
                 }, templateContent);
                 const options = await tempDiv.$$('.fuli-option');
                 let answers = [];
-
                 for (const option of options) {
                     const datasetOption = await option.evaluate(node => node.dataset.option);
                     const datasetAnswer = await option.evaluate(node => node.dataset.answer);
@@ -75,7 +74,6 @@ var lottery_default = {
                     }
                 }
                 logger.log(`提取到的答案: ${JSON.stringify(answers)}`);
-
                 let formData = {};
                 const urlParams = new URLSearchParams(task_page.url().split('?')[1]);
                 snValue = urlParams.get('sn');
