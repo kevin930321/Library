@@ -56,48 +56,22 @@ var lottery_default = {
             // 檢查是否有 question-popup 元素
             if (await task_page.$("#question-popup")) {
               logger.log("發現 question-popup 元素，需要回答問題");
-              const tokenResponse = await task_page.request.get("https://fuli.gamer.com.tw/ajax/getCSRFToken.php?_=1702883537159");
-              const csrfToken = (await tokenResponse.text()).trim();
-              // const templateContent = await task_page.locator("#question-popup").innerHTML();
-              // 使用evaluate來獲取所有問題的number
-              const questionNumbers = await task_page.evaluate(() => {
-                  const questionElements = document.querySelectorAll('.fuli-option[data-question]');
-                  const numbers = new Set();
-                  questionElements.forEach(el => {
-                      numbers.add(el.getAttribute('data-question'));
-                  });
-                  return Array.from(numbers); // Convert Set to Array
-              });
-
-              let answers = [];
-              for (let question of questionNumbers) {
-                // 等待元素出現再獲取屬性
-                await task_page.waitForSelector(`.fuli-option[data-question="${question}"]`);
-                const answer = await task_page.locator(`.fuli-option[data-question="${question}"]`).getAttribute("data-answer");
-                answers.push(answer);
-              }
-              let formData = new URLSearchParams();
-              const urlParams = new URLSearchParams(task_page.url().split('?')[1]);
-              snValue = urlParams.get('sn');
-              formData.append('sn', snValue);
-              formData.append('token', csrfToken);
-              answers.forEach((ans, index) => {
-                formData.append(`answer[${index}]`, ans);
-              });
               try {
-                await task_page.request.post("https://fuli.gamer.com.tw/ajax/answer_question.php", {
-                  headers: {
-                    "Content-Type": "application/x-www-form-urlencoded"
-                  },
-                  body: formData.toString()
-                });
+                // 獲取 CSRF Token
+                const tokenResponse = await task_page.request.get("https://fuli.gamer.com.tw/ajax/getCSRFToken.php?_=1702883537159");
+                const csrfToken = (await tokenResponse.text()).trim();
+
+                // 提取問題和答案並提交
+                await answerQuestion(task_page, csrfToken, logger);
+
+                // 重新載入頁面
                 await task_page.reload();
                 await task_page.waitForLoadState('networkidle');
+                logger.log("問題回答完畢");
               } catch (error) {
-                logger.error("post 回答問題時發生錯誤,正在重試中");
+                logger.error("回答問題時發生錯誤:", error);
                 continue; // 如果回答問題失敗，繼續下一次重試
               }
-              logger.log("問題回答完畢");
             }
 
             // 跳過廣告步驟
@@ -178,6 +152,49 @@ var lottery_default = {
     return { lottery, unfinished };
   }
 };
+
+async function answerQuestion(task_page, csrfToken, logger) {
+  try {
+    // 使用evaluate來獲取所有問題的number
+    const questionNumbers = await task_page.evaluate(() => {
+      const questionElements = document.querySelectorAll('.fuli-option[data-question]');
+      const numbers = new Set();
+      questionElements.forEach(el => {
+        numbers.add(el.getAttribute('data-question'));
+      });
+      return Array.from(numbers); // Convert Set to Array
+    });
+
+    let answers = [];
+    for (let question of questionNumbers) {
+      // 等待元素出現再獲取屬性
+      await task_page.waitForSelector(`.fuli-option[data-question="${question}"]`);
+      const answer = await task_page.locator(`.fuli-option[data-question="${question}"]`).getAttribute("data-answer");
+      answers.push(answer);
+    }
+
+    let formData = new URLSearchParams();
+    const urlParams = new URLSearchParams(task_page.url().split('?')[1]);
+    const snValue = urlParams.get('sn');
+    formData.append('sn', snValue);
+    formData.append('token', csrfToken);
+    answers.forEach((ans, index) => {
+      formData.append(`answer[${index}]`, ans);
+    });
+
+    // 發送 POST 請求
+    await task_page.request.post("https://fuli.gamer.com.tw/ajax/answer_question.php", {
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      body: formData.toString()
+    });
+    logger.log("問題已回答");
+  } catch (error) {
+    logger.error("發送回答問題請求時發生錯誤:", error);
+    throw error; // 重新拋出錯誤，以便外部處理
+  }
+}
 
 async function getList(page, logger) {
   let draws;
