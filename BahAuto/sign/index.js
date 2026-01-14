@@ -129,7 +129,7 @@ async function do_signin(page, logger) {
   }
 }
 
-// 執行雙倍簽到獎勵
+// 執行雙倍簽到獎勵 (使用 finish_ad.php 繞過廣告)
 async function do_double_signin(page, logger) {
   try {
     // 獲取 CSRF Token
@@ -137,10 +137,13 @@ async function do_double_signin(page, logger) {
     const csrfToken = (await tokenResponse.text()).trim();
     logger.log(`CSRF Token: ${csrfToken.substring(0, 10)}...`);
 
-    // 模擬觀看廣告完成
-    const response = await page.request.post("https://www.gamer.com.tw/ajax/signin.php", {
-      headers: APP_HEADERS,
-      data: `action=3&token=${encodeURIComponent(csrfToken)}`
+    // 使用 finish_ad.php 模擬廣告觀看完成 (與 lottery 模組相同的方法)
+    // area=signin 表示簽到的雙倍獎勵
+    const response = await page.request.post("https://www.gamer.com.tw/ajax/finish_ad.php", {
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      data: `token=${encodeURIComponent(csrfToken)}&area=signin`
     });
 
     const responseText = await response.text();
@@ -154,9 +157,9 @@ async function do_double_signin(page, logger) {
     }
 
     // 檢查各種可能的成功條件
-    const isSuccess = result.data?.finishedAd === 1 ||
-      result.data?.finishedAd === true ||
-      result.ok === 1 ||
+    const isSuccess = result.ok === 1 ||
+      result.data?.ok === 1 ||
+      result.data?.finished === 1 ||
       result.error?.code === 0;
 
     return {
