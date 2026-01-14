@@ -135,6 +135,7 @@ async function do_double_signin(page, logger) {
     // 獲取 CSRF Token
     const tokenResponse = await page.request.get("https://www.gamer.com.tw/ajax/get_csrf_token.php");
     const csrfToken = (await tokenResponse.text()).trim();
+    logger.log(`CSRF Token: ${csrfToken.substring(0, 10)}...`);
 
     // 模擬觀看廣告完成
     const response = await page.request.post("https://www.gamer.com.tw/ajax/signin.php", {
@@ -142,8 +143,27 @@ async function do_double_signin(page, logger) {
       data: `action=3&token=${encodeURIComponent(csrfToken)}`
     });
 
-    const result = await response.json();
-    return { ok: result.data?.finishedAd === 1, message: result.message, data: result.data };
+    const responseText = await response.text();
+    logger.log(`API 回應: ${responseText}`);
+
+    let result;
+    try {
+      result = JSON.parse(responseText);
+    } catch (e) {
+      return { ok: false, message: `JSON 解析失敗: ${responseText.substring(0, 100)}` };
+    }
+
+    // 檢查各種可能的成功條件
+    const isSuccess = result.data?.finishedAd === 1 ||
+      result.data?.finishedAd === true ||
+      result.ok === 1 ||
+      result.error?.code === 0;
+
+    return {
+      ok: isSuccess,
+      message: result.message || result.error?.message || JSON.stringify(result),
+      data: result.data
+    };
   } catch (err) {
     logger.error("雙倍獎勵請求失敗:", err);
     return { ok: false, message: err.message };
