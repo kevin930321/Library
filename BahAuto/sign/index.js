@@ -38,19 +38,26 @@ var sign_default = {
               throw new Error("Button disabled");
             }
             logger.log("\u5617\u8A66\u89C0\u770B\u5EE3\u544A\u4EE5\u7372\u5F97\u96D9\u500D\u734E\u52F5\uFF0C\u53EF\u80FD\u9700\u8981\u591A\u9054 1 \u5206\u9418");
-            await Promise.all([
-              page.waitForResponse(/\gampad\/ads/),
-              page.click("button.popup-dailybox__btn")
-            ]);
-            await page.waitForTimeout(50);
+
+            // 點擊領取雙倍巴幣按鈕
+            await page.click("button.popup-dailybox__btn");
+            await page.waitForTimeout(1000);
+
+            // 檢查是否顯示廣告能量補充中
             if (await page.$("text=\u5EE3\u544A\u80FD\u91CF\u88DC\u5145\u4E2D \u8ACB\u7A0D\u5F8C\u518D\u8A66\u3002")) {
               throw new Error("\u5EE3\u544A\u80FD\u91CF\u88DC\u5145\u4E2D\uFF0C\u8ACB\u7A0D\u5F8C\u518D\u8A66");
             }
-            await page.waitForSelector("button[type=submit]");
-            await page.waitForTimeout(100);
-            await page.click("button[type=submit]");
-            await page.waitForTimeout(3e3);
-            await page.waitForSelector("ins iframe");
+
+            // 檢查是否有確認按鈕（可能是新流程）
+            const submitBtn = await page.$("button[type=submit]");
+            if (submitBtn) {
+              await page.waitForTimeout(100);
+              await page.click("button[type=submit]");
+              await page.waitForTimeout(3000);
+            }
+
+            // 等待廣告 iframe 出現
+            await page.waitForSelector("ins iframe", { timeout: 10000 });
             const ad_iframe = await page.$("ins iframe");
             const ad_frame = await ad_iframe.contentFrame();
             await shared.ad_handler({ ad_frame });
