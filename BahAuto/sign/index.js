@@ -86,13 +86,22 @@ var sign_default = {
   }
 };
 
+// 模擬 Android App 的 headers
+const APP_HEADERS = {
+  "Content-Type": "application/x-www-form-urlencoded",
+  "User-Agent": "Bahadroid (https://www.gamer.com.tw/)",
+  "x-bahamut-app-instanceid": "cc2zQIfDpg4",
+  "X-Bahamut-App-Version": "982",
+  "X-Bahamut-App-Android": "tw.com.gamer.android.activecenter",
+  "Connection": "Keep-Alive",
+  "accept-encoding": "gzip"
+};
+
 // 查詢簽到狀態
 async function sign_status(page, logger) {
   try {
     const response = await page.request.post("https://www.gamer.com.tw/ajax/signin.php", {
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded"
-      },
+      headers: APP_HEADERS,
       data: "action=2"
     });
 
@@ -108,9 +117,7 @@ async function sign_status(page, logger) {
 async function do_signin(page, logger) {
   try {
     const response = await page.request.post("https://www.gamer.com.tw/ajax/signin.php", {
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded"
-      },
+      headers: APP_HEADERS,
       data: "action=1"
     });
 
@@ -131,9 +138,7 @@ async function do_double_signin(page, logger) {
 
     // 模擬觀看廣告完成
     const response = await page.request.post("https://www.gamer.com.tw/ajax/signin.php", {
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded"
-      },
+      headers: APP_HEADERS,
       data: `action=3&token=${encodeURIComponent(csrfToken)}`
     });
 
