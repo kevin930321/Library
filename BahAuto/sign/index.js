@@ -29,7 +29,7 @@ var sign_default = {
           await goto(page, "home");
           await page.waitForSelector("a#signin-btn", { state: 'attached' });
           await page.waitForTimeout(50);
-          await page.click("a#signin-btn");
+          await page.$eval("a#signin-btn", (el) => el.click());
           await page.waitForSelector("button.popup-dailybox__btn");
           await page.waitForTimeout(50);
           if (!finishedAd) {
