@@ -27,7 +27,7 @@ var sign_default = {
         try {
           logger.log(`\u6B63\u5728\u6AA2\u6E2C\u96D9\u500D\u7C3D\u5230\u734E\u52F5\u72C0\u614B`);
           await goto(page, "home");
-          await page.waitForSelector("a#signin-btn");
+          await page.waitForSelector("a#signin-btn", { state: 'attached' });
           await page.waitForTimeout(50);
           await page.click("a#signin-btn");
           await page.waitForSelector("button.popup-dailybox__btn");
