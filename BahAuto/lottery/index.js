@@ -103,7 +103,7 @@ var lottery_default = {
                   await task_page.waitForLoadState('networkidle');
                 } catch (error) {
                   logger.error("post 回答問題時發生錯誤,正在重試中");
-                  continue; // retry
+                  continue;
                 }
               }
               
@@ -164,13 +164,12 @@ var lottery_default = {
                   
                   logger.success(`[${name}] 成功發送跳過廣告請求`);
                   await task_page.waitForTimeout(1500);
-                  break; // 送出完成後跳出 retry 迴圈進行結算
+                  break;
                 } catch (error) {
                   logger.error(`發送已看廣告請求時發生錯誤: ${error.message}`);
                 }
               }
               
-              // 若前面遭遇錯誤未跳出，則等待一小段時間後重試
               await task_page.waitForTimeout(1000);
             }
 
@@ -189,8 +188,6 @@ var lottery_default = {
               if (await task_page.$(".card > .section > p") && await task_page.$eval(".card > .section > p", (elm) => elm.innerText.includes("成功"))) {
                 logger.success(`已完成一次抽抽樂：${name} \u001b[92m✔\u001b[m`);
                 lottery++;
-                delete unfinished[name];
-                break; // 成功抽完直接跳出該商品的重試迴圈
               } else {
                 logger.warn(final_url);
                 logger.warn(`廣告抽獎券: ${AdCoupon}`);
