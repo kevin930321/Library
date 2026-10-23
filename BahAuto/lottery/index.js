@@ -237,34 +237,55 @@ async function isBlocked(page) {
 async function dumpPage(page, logger, tag) {
   const title = await page.title().catch(() => "");
   logger.error(`頁面異常: ${page.url()} | ${title}`);
+  const info = await page
+    .evaluate(() => {
+      const h1 = document.querySelector("h1");
+      const chain = [];
+      let node = h1;
+      while (node && node !== document.body) {
+        const cls = typeof node.className === "string" && node.className.trim() ? "." + node.className.trim().split(/\s+/).join(".") : "";
+        chain.push(node.tagName.toLowerCase() + (node.id ? "#" + node.id : "") + cls);
+        node = node.parentElement;
+      }
+      return {
+        hasH1: !!h1,
+        hasMaster: !!document.querySelector("#BH-master"),
+        hasBuyLink: !!document.querySelector("a[href*='buyD.php']"),
+        chain: chain.reverse().join(" > "),
+      };
+    })
+    .catch(() => null);
+  if (info) logger.error(`DOM 結構: ${JSON.stringify(info)}`);
   await page.screenshot({ path: `debug-${tag}.png`, fullPage: true }).catch(() => {});
 }
 
 async function openDrawPage(page, link, logger, tag) {
-  const selector = "#BH-master > .BH-lbox.fuli-pbox h1";
+  const selector = "h1, a[href*='buyD.php']";
   await page.goto(link, { waitUntil: "domcontentloaded" });
-  try {
-    await page.waitForSelector(selector, { timeout: 15000 });
-    return;
-  } catch (err) {
-    if (!(await isBlocked(page))) {
-      await dumpPage(page, logger, tag);
-      throw err;
+  for (let round = 0; round < 2; round++) {
+    let found = true;
+    try {
+      await page.waitForSelector(selector, { state: "attached", timeout: 15000 });
+    } catch (err) {
+      found = false;
+      if (!(await isBlocked(page))) {
+        await dumpPage(page, logger, tag);
+        throw err;
+      }
+    }
+    if (found && !(await isBlocked(page))) {
+      await page.waitForLoadState("load", { timeout: 10000 }).catch(() => {});
+      return;
+    }
+    if (round === 0) {
+      logger.warn("偵測到 Cloudflare 驗證頁，等待自動通過");
+      await page
+        .waitForFunction(() => !/Just a moment|Attention Required|請稍候/i.test(document.title), null, { timeout: 20000 })
+        .catch(() => {});
     }
   }
-  logger.warn("偵測到 Cloudflare 驗證頁，等待自動通過");
-  await page
-    .waitForFunction(() => !/Just a moment|Attention Required|請稍候/i.test(document.title), null, { timeout: 20000 })
-    .catch(() => {});
-  try {
-    await page.waitForSelector(selector, { timeout: 15000 });
-  } catch (err) {
-    await dumpPage(page, logger, tag);
-    if (await isBlocked(page)) {
-      throw new BlockedError("被 Cloudflare 擋住，無法進入頁面");
-    }
-    throw err;
-  }
+  await dumpPage(page, logger, tag);
+  throw new BlockedError("被 Cloudflare 擋住，無法進入頁面");
 }
 
 async function getList(page, logger) {
